@@ -1,0 +1,275 @@
+{
+  "skill_name": "group-synastry",
+  "version": "1.2",
+  "description": "Behavioral eval suite for group-synastry. Each eval pairs a prompt with concrete, discriminating expectations. Reference positions in expectations are taken from validated Swiss Ephemeris computation (see reference-charts.json). Tolerances are stated explicitly per assertion. The reference subjects 'Alex' and 'Jordan' are fictional test personas with synthetic birth data.",
+  "reference_data": "reference-charts.json",
+
+  "truth_sources_doc": {
+    "_doc": "Each eval below declares a `truth_sources` array listing the ephemerides/datasets whose output the eval's expectations check. Changing one of these sources should be expected to invalidate (or require re-tuning) the matching evals. Codes overlap with reference-charts.json's source_schema where applicable.",
+    "codes": {
+      "swisseph_builtin":     "Swiss Ephemeris via pyswisseph 2.10 with Moshier fallback. Determines truth for Sun-Pluto, Lilith (mean apogee), nodes, ayanamsa, and houses/angles.",
+      "swisseph_with_seas18": "Swiss Ephemeris with seas_18.se1 installed (bundled in <skill>/ephe/ as of v1.2). Determines truth for arcsecond/arcminute-accurate Chiron, Ceres, Pallas, Juno, Vesta. lib/ephem.py raises EphemerisFileMissing if a body whose best source is this code is requested while the file is absent.",
+      "keplerian_jpl_j2000":  "JPL J2000 osculating Keplerian elements via lib/kepler.py. Best source for (136199) Eris (no bundled Swiss Eph file). Acceptable fallback for Chiron/Ceres/Pallas/Juno/Vesta via lib.ephem.calc_body(..., force_source='keplerian_jpl_j2000') when reproducibility across machines without seas_18.se1 matters; not used as a silent fallback.",
+      "zoneinfo":             "Python's zoneinfo module (IANA tzdata). Determines truth for historical-DST resolution (e.g. CDT/MST/PST/etc. in past years).",
+      "schema":               "File-format correctness for people.json and settings.json. No ephemeris involvement.",
+      "derived":              "Computed from other inputs in the eval (midpoints, age arithmetic, calendar conversions). No external ephemeris.",
+      "behavior":             "Skill-behavior assertions (clarifying questions, output-format announcements, refusal to fabricate). No truth data involved."
+    }
+  },
+
+  "evals": [
+    {
+      "id": 1,
+      "category": "db-add-with-DST-conversion",
+      "truth_sources": ["zoneinfo", "schema"],
+      "prompt": "Add Alex to my group: born June 15, 1988 at 8:20 AM in Chicago, Illinois (41.88°N, 87.63°W, CDT)",
+      "expected_output": "people.json updated with Alex; tz stored as IANA name 'America/Chicago' which correctly resolves to CDT (UTC-5) for the birth date",
+      "expectations": [
+        "people.json contains an entry with display_name 'Alex'",
+        "Alex's birth.tz is a valid IANA timezone identifier (specifically 'America/Chicago'). The bare abbreviation 'CDT' is not stored, because the schema requires IANA names so that historical DST is correctly applied.",
+        "When the stored tz is applied to '1988-06-15 08:20' local time, the resulting UTC offset is -05:00. This confirms CDT (daylight time) was correctly resolved for that June date.",
+        "Alex's birth.lat is 41.88 (positive, North) and birth.lon is -87.63 (negative for West).",
+        "Alex's birth.time_accuracy is set (one of: exact, approximate, noon-default, unknown). The skill either asked the user OR inferred from context that '8:20 AM' implies exact."
+      ]
+    },
+    {
+      "id": 2,
+      "category": "db-add-with-DST-conversion",
+      "truth_sources": ["zoneinfo", "schema"],
+      "prompt": "Add Jordan to my group: born February 9, 1991 at 2:45 PM MST in Denver, Colorado (39.74°N, 104.99°W)",
+      "expected_output": "people.json updated; tz field is 'America/Denver'; system confirms MST (standard time, not daylight) was in effect for Feb 1991",
+      "expectations": [
+        "people.json contains an entry with display_name 'Jordan'",
+        "Jordan's birth.tz is 'America/Denver' (IANA name), not the abbreviation 'MST'.",
+        "When the stored tz is applied to '1991-02-09 14:45' local time, the resulting UTC offset is -07:00 (confirming MST/standard time was correctly resolved for that February date per zoneinfo).",
+        "Jordan's birth.lat is 39.74 and birth.lon is -104.99."
+      ]
+    },
+    {
+      "id": 3,
+      "category": "db-add-without-time",
+      "truth_sources": ["schema", "behavior", "zoneinfo"],
+      "prompt": "Add Sarah to my group, born March 15, 1990 in San Francisco. I don't know her exact birth time.",
+      "expected_output": "Skill handles missing time gracefully: either asks before defaulting, or sets time_accuracy='unknown' and warns about disabled features",
+      "expectations": [
+        "people.json contains an entry with display_name 'Sarah'",
+        "EITHER (a) the skill set Sarah's birth.time_accuracy to 'unknown' and birth.time to a flagged default like '12:00', OR (b) the skill asked the user before storing any time value.",
+        "The skill informed the user that without an exact birth time, the Ascendant, MC, Vertex, and house cusps cannot be reliably computed.",
+        "Sarah's birth.tz is 'America/Los_Angeles' (IANA name), not 'PST' or 'PDT'."
+      ]
+    },
+    {
+      "id": 4,
+      "category": "natal-western-tropical",
+      "truth_sources": ["swisseph_builtin", "swisseph_with_seas18", "keplerian_jpl_j2000"],
+      "prompt": "Show me Alex's Western tropical natal chart",
+      "expected_output": "Markdown chart with all standard bodies plus Chiron, Lilith, Ceres, Eris; positions match the precomputed reference within stated tolerances",
+      "expectations": [
+        "Output reports Sun at 24° Gemini 39' ± 1 arcminute (reference: 24°39').",
+        "Output reports Moon at 8° Cancer 29' ± 1 arcminute.",
+        "Output reports Mercury at 21° Gemini 02' (retrograde) and Venus at 20° Gemini 37' (retrograde); the Mercury-Venus conjunction in Gemini is identified (orb under 0°30').",
+        "Output reports Ascendant at 2° Leo 42' (± 5 arcminutes; angles depend on precise location).",
+        "Output reports Midheaven at 17° Aries 48' (± 5 arcminutes).",
+        "Output identifies the Saturn-Uranus conjunction in Sagittarius as a notable feature (orb under 0°30'; this is the late-1980s generational conjunction).",
+        "Output includes Chiron, Lilith (Mean Apogee/Black Moon), Ceres, AND Eris. None of these four can be omitted (per spec D6 they are always-included bodies).",
+        "Output explicitly states the zodiac (tropical) and house system used (Placidus default, or whatever was specified)."
+      ]
+    },
+    {
+      "id": 5,
+      "category": "natal-vedic-sidereal",
+      "truth_sources": ["swisseph_builtin", "derived"],
+      "prompt": "Compute Alex's Vedic chart with Lahiri ayanamsa",
+      "expected_output": "Sidereal positions with Lahiri ayanamsa applied (~23.7° for 1988); the rising sign shifts from tropical Leo to sidereal Cancer; Vimshottari Mahadasha computed from Moon's nakshatra",
+      "expectations": [
+        "Output explicitly states the ayanamsa used is Lahiri (value approximately 23.7° for a 1988 birth).",
+        "Output reports the Sun at approximately 0° Gemini 57' sidereal (Mithuna) ± 2 arcminutes — about 23.7° earlier than the tropical position.",
+        "Output reports the Moon at approximately 14° Gemini 47' sidereal (Mithuna) ± 2 arcminutes.",
+        "Output reports the Lagna (sidereal Ascendant) at approximately 9° Cancer 00' (Karka) ± 5 arcminutes — the rising sign in sidereal is Cancer, NOT Leo as in the tropical chart. (This sign shift on the angle is the key sidereal-vs-tropical discriminator for this subject.)",
+        "Output includes nakshatra placement for at least the Moon. The Moon's nakshatra should be Ardra (pada 3), whose lord is Rahu.",
+        "Output identifies the current Vimshottari Mahadasha as Saturn (active from approximately 2011 to approximately 2030)."
+      ]
+    },
+    {
+      "id": 6,
+      "category": "natal-chinese-bazi",
+      "truth_sources": ["derived"],
+      "prompt": "Generate Alex's Chinese Four Pillars (BaZi) chart",
+      "expected_output": "Four pillars computed using solar terms (not lunar new year); Day Master identified and interpreted",
+      "expectations": [
+        "The YEAR pillar is determined by the solar year boundary Lichun (~Feb 4), NOT by the lunar new year — a June 15 birth is unambiguously in the post-Lichun solar year, so this distinction must be applied correctly.",
+        "The MONTH pillar is derived from the solar month (jieqi) containing June 15, not from a calendar month.",
+        "The DAY pillar's heavenly stem is explicitly identified as the Day Master (the chart's 'self'), computed from the sexagenary day count.",
+        "The HOUR pillar is derived from the two-hour branch containing 08:20 local time (the Chen / 7–9 AM block).",
+        "Output explicitly names the Day Master element and interprets at least one feature of the chart in light of it.",
+        "(Reference pillar values to be pinned when Phase 3 BaZi computation ships; this eval currently checks method correctness, not exact stem-branch values.)"
+      ]
+    },
+    {
+      "id": 7,
+      "category": "synastry-full",
+      "truth_sources": ["swisseph_builtin", "swisseph_with_seas18", "keplerian_jpl_j2000", "behavior"],
+      "prompt": "Generate the synastry chart between Alex and Jordan",
+      "expected_output": "Inter-aspect table + house overlays both directions + asteroid contacts (Chiron, Eris, Lilith, Ceres)",
+      "expectations": [
+        "Output includes the Alex-Venus-trine-Jordan-Sun aspect with orb under 0°05' (this is the tightest cross-chart aspect, reference 0°02').",
+        "Output includes the Alex-Sun-trine-Jordan-Sun cross-luminary aspect (Gemini-Aquarius, air trine, orb approximately 4°00').",
+        "Output includes house overlays in BOTH directions — Alex's planets in Jordan's houses AND Jordan's planets in Alex's houses. Missing either direction is a fail.",
+        "Output explicitly includes contacts for Chiron AND Eris AND Lilith AND Ceres. Missing any of the four is a fail (per spec D6).",
+        "Output identifies the Alex-Mars-conjunct-Jordan-Venus contact (orb under 0°30', reference 0°23') among the tight relational aspects.",
+        "Output identifies at least one tight Chiron contact. With seas_18.se1 bundled (skill v1.2+), the discriminating contact is Alex-Jupiter-sextile-Jordan-Chiron (orb under 0°20', reference 0°15'). A contact computed via the Keplerian Chiron fallback would shift by up to ±1-2° and is not the correct expectation under the bundled-Swiss-Eph regime.",
+        "EITHER the skill asked the user about output format before computing, OR the user's prompt specified a format, OR the skill defaulted to inline markdown AND noted that .docx/.pdf are also available."
+      ]
+    },
+    {
+      "id": 8,
+      "category": "composite",
+      "truth_sources": ["swisseph_builtin", "swisseph_with_seas18", "derived", "behavior"],
+      "prompt": "Make the composite chart for Alex and Jordan",
+      "expected_output": "Midpoint composite with key features identified; Davison either offered, computed, or asked about",
+      "expectations": [
+        "Composite Sun is at approximately 22° Aries 39' ± 5 arcminutes (shorter-arc midpoint of Gemini Sun and Aquarius Sun).",
+        "Composite Moon is at approximately 2° Libra 38' ± 5 arcminutes.",
+        "Composite Ascendant is at approximately 25° Cancer 48' ± 10 arcminutes.",
+        "Output identifies a tight composite contact. With seas_18.se1 bundled (skill v1.2+), the discriminating feature is the composite Saturn-Ceres conjunction in Capricorn at orb under 0°10' (reference 0°08'). A Ceres position from the Keplerian fallback would not place this contact correctly.",
+        "Output identifies the composite Moon-quincunx-Venus contact (orb under 0°05', reference 0°03') OR another correctly-derived tight internal aspect.",
+        "Output either (a) computes both midpoint composite AND Davison, (b) asks the user which method to use, or (c) computes one method and explicitly notes the other is available."
+      ]
+    },
+    {
+      "id": 9,
+      "category": "composite-davison",
+      "truth_sources": ["swisseph_builtin", "derived"],
+      "prompt": "Compute the Davison chart for Alex and Jordan",
+      "expected_output": "Davison chart cast at the literal temporal and spatial midpoint; positions distinct from midpoint composite",
+      "expectations": [
+        "The Davison date is approximately October 13, 1989 (± 1 day) — the temporal midpoint between June 1988 and February 1991.",
+        "The Davison location is approximately 41.14°N, 96.45°W (± 0.5°) — midpoint between Chicago (41.88°N, 87.63°W) and Denver (39.74°N, 104.99°W).",
+        "The Davison Sun is at approximately 19° Libra 52' ± 5 arcminutes.",
+        "The Davison Ascendant is at approximately 25° Cancer 53' ± 10 arcminutes.",
+        "The output distinguishes Davison method from midpoint composite explicitly (it does not silently substitute one for the other)."
+      ]
+    },
+    {
+      "id": 10,
+      "category": "behavior-clarification-vague-request",
+      "truth_sources": ["behavior"],
+      "prompt": "Do Alex's chart",
+      "expected_output": "Skill asks at least one clarifying question (system / format / depth) before computing anything",
+      "expectations": [
+        "The skill asked at least one clarifying question before producing any chart data. Computing immediately without asking is a fail.",
+        "Among the clarifying questions, at least one was about: which astrological system, OR output format, OR depth of interpretation.",
+        "The skill stated its defaults clearly so the user could say 'just go' / 'use defaults' / 'whatever you recommend'.",
+        "The skill asked NO MORE THAN 2 questions in a single turn (per spec §9.4: 'Never more than 2 questions at once')."
+      ]
+    },
+    {
+      "id": 11,
+      "category": "behavior-clarification-expensive-op",
+      "truth_sources": ["behavior"],
+      "prompt": "Compatibility matrix for everyone in my group",
+      "expected_output": "Skill confirms scope, depth, and output format before running N×N synastry",
+      "expectations": [
+        "The skill enumerated the people in the group AND stated the number of pairs (N(N-1)/2) before any computation.",
+        "The skill asked about depth (e.g. one-line summary per pair, paragraph per pair, or full synastry report per pair) OR offered a default depth and let the user override.",
+        "The skill asked about output format (single combined doc, one file per pair, or inline) OR confirmed a default.",
+        "The skill did NOT proceed to compute the full matrix without confirmation when the group has more than 3 people."
+      ]
+    },
+    {
+      "id": 12,
+      "category": "output-docx",
+      "truth_sources": ["behavior", "swisseph_builtin", "swisseph_with_seas18", "keplerian_jpl_j2000"],
+      "prompt": "Make a Word doc of the synastry between Alex and Jordan",
+      "expected_output": ".docx file successfully created at the expected output path and validates without errors",
+      "expectations": [
+        "A .docx file is created. On claude.ai its path is /mnt/user-data/outputs/; in Claude Code it defaults to the current working directory unless the user specified otherwise.",
+        "The .docx file passes the docx skill's validate.py without errors.",
+        "The .docx contains a title page identifying both people by display name and the chart type (synastry).",
+        "The .docx contains the synastry inter-aspect table with at least the cross-luminary contacts.",
+        "The .docx contains house overlay sections for BOTH directions.",
+        "The .docx contains a synthesis or interpretation section, not just data tables.",
+        "The skill announced the output path and presented the file (via present_files in claude.ai or by stating the absolute path in Claude Code)."
+      ]
+    },
+    {
+      "id": 13,
+      "category": "behavior-missing-person",
+      "truth_sources": ["behavior", "schema"],
+      "prompt": "Synastry between Alex and Alice",
+      "expected_output": "Skill detects Alice is not in the database; offers a path forward without auto-adding or fabricating data",
+      "expectations": [
+        "The skill explicitly noted that Alice is not in the database.",
+        "The skill offered the user a clear next step: add Alice to the group, OR provide her birth data inline for a one-off synastry.",
+        "The skill did NOT auto-add Alice to the database without confirmation.",
+        "The skill did NOT proceed with computation using fabricated, default, or placeholder data for Alice."
+      ]
+    },
+    {
+      "id": 14,
+      "category": "predictive-transits",
+      "truth_sources": ["swisseph_builtin", "behavior"],
+      "prompt": "What transits are hitting Alex right now",
+      "expected_output": "Current sky positions cross-referenced with Alex's natal; slow-mover focus; default to today with explicit acknowledgement",
+      "expectations": [
+        "The skill used today's date (within 7 days of when the eval was run) to compute current transits, and stated the date it used explicitly (e.g. 'as of [today's date]').",
+        "Output focuses on slow planets (Saturn, Uranus, Neptune, Pluto, Nodes) as the primary signals; transient transits (Moon, Mercury) are de-emphasized or excluded.",
+        "Output identifies at least one specific current slow-transit contact to Alex's natal chart, computed (not fabricated) from today's sky against the reference natal positions.",
+        "Predictive output is produced only because the user explicitly asked for transits — the skill does not volunteer predictive work unprompted."
+      ]
+    },
+    {
+      "id": 15,
+      "category": "predictive-solar-return",
+      "truth_sources": ["swisseph_builtin", "behavior"],
+      "prompt": "Compute Alex's solar return for 2026",
+      "expected_output": "Solar Return chart cast for the exact moment Sun returns to natal position; SR angles computed for chosen location",
+      "expectations": [
+        "The Solar Return moment computed is approximately 2026-06-15 17:50 UT (± 5 minutes; the exact moment the Sun returns to 24°39' Gemini).",
+        "The Solar Return Ascendant is approximately 25° Virgo when relocated to Chicago, IL (± 30 arcminutes).",
+        "Output identifies the Solar Return Sun's house placement in the SR chart.",
+        "If the user did not specify SR location, the skill EITHER asked OR defaulted to natal location with an explicit note (some astrologers use current residence; the skill should not silently pick one).",
+        "Output includes the SR Moon position and at least the SR positions of Saturn and Jupiter."
+      ]
+    },
+    {
+      "id": 16,
+      "category": "predictive-profection",
+      "truth_sources": ["derived", "swisseph_builtin"],
+      "prompt": "What's Alex's annual profection for this year",
+      "expected_output": "3rd-house profection at age 38 with Venus as Lord of the Year",
+      "expectations": [
+        "Output identifies the profected house from age: at age 38, 38 mod 12 = 2, so the profection is the 3rd house (counting the natal Ascendant sign as the 1st).",
+        "Output identifies the profected sign as Libra (the 3rd sign from Alex's natal Leo Ascendant).",
+        "Output identifies the Lord of the Year as Venus (ruler of Libra).",
+        "Output notes the natal placement of Venus at 20° Gemini 37' (retrograde) in the 11th house, since the year-lord's natal placement is what activates this year.",
+        "Output explains briefly what 3rd-house profection years signify in the Hellenistic tradition (siblings, communication, local environment, learning; transits to the year-lord Venus carry extra weight this year)."
+      ]
+    },
+    {
+      "id": 17,
+      "category": "db-add-other-tz",
+      "truth_sources": ["zoneinfo", "schema"],
+      "prompt": "Add Bob to my group, born Jan 1, 1980 at 6 PM PST in Los Angeles",
+      "expected_output": "Skill stores tz as IANA 'America/Los_Angeles' and correctly resolves PST (UTC-8) for Jan 1980",
+      "expectations": [
+        "people.json contains an entry with display_name 'Bob'.",
+        "Bob's birth.tz is 'America/Los_Angeles', not 'PST'.",
+        "When tz is applied to '1980-01-01 18:00' local time, the UTC offset is -08:00 (confirming PST in winter; not PDT).",
+        "Bob's birth.lat and birth.lon are both populated with reasonable values for Los Angeles (lat ~34, lon ~-118)."
+      ]
+    },
+    {
+      "id": 18,
+      "category": "settings-persistence",
+      "truth_sources": ["schema", "behavior"],
+      "prompt": "From now on always use Whole-Sign houses for my charts",
+      "expected_output": "settings.json updated; subsequent chart requests use Whole-Sign without re-asking",
+      "expectations": [
+        "settings.json (or equivalent persistent settings file) is updated with default_house_system set to 'whole-sign' (or equivalent representation).",
+        "The skill confirmed the change to the user.",
+        "If the next chart request comes in (in the same session or a subsequent one), the skill uses Whole-Sign WITHOUT asking about house system again — the persistent preference overrides the per-call clarification."
+      ]
+    }
+  ]
+}

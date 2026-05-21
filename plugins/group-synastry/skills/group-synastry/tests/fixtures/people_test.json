@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "updated_at": "2026-05-04T12:00:00Z",
+  "people": [
+    {
+      "id": "alex",
+      "display_name": "Alex",
+      "birth": {
+        "date": "1988-06-15",
+        "time": "08:20",
+        "tz": "America/Chicago",
+        "lat": 41.8781,
+        "lon": -87.6298,
+        "place_label": "Chicago, IL",
+        "time_accuracy": "exact"
+      },
+      "tags": ["test-subject"]
+    },
+    {
+      "id": "jordan",
+      "display_name": "Jordan",
+      "birth": {
+        "date": "1991-02-09",
+        "time": "14:45",
+        "tz": "America/Denver",
+        "lat": 39.7392,
+        "lon": -104.9903,
+        "place_label": "Denver, CO",
+        "time_accuracy": "exact"
+      },
+      "tags": ["test-subject"]
+    }
+  ],
+  "cohorts": []
+}

@@ -1,0 +1,11 @@
+{
+  "name": "group-synastry-skill",
+  "version": "0.2.0",
+  "description": "Node-side dependencies for the group-synastry skill (Phase 2 .docx rendering).",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "docx": "^9.0.0",
+    "marked": "^18.0.3"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "default_theme": "light",
+  "fonts": {
+    "body": "Calibri",
+    "heading": "Calibri",
+    "mono": "Consolas"
+  },
+  "font_sizes_pt": {
+    "title": 28,
+    "h1": 18,
+    "h2": 14,
+    "h3": 12,
+    "body": 11,
+    "table": 10,
+    "footer": 9
+  },
+  "page_size": "letter",
+  "margins_twips": {
+    "top": 1080,
+    "right": 1080,
+    "bottom": 1080,
+    "left": 1080
+  },
+  "themes": {
+    "light": {
+      "page_bg": "FFFFFF",
+      "text": "000000",
+      "title": "1F2A4A",
+      "heading": "2E3E68",
+      "subheading": "3D5285",
+      "accent": "8B6F47",
+      "rule": "B8B4C8",
+      "table_header_bg": "2E3E68",
+      "table_header_fg": "FFFFFF",
+      "table_alt_row_bg": "F2F0F7",
+      "table_row_fg": "000000"
+    },
+    "dark": {
+      "page_bg": "1A1A24",
+      "text": "E8E6F0",
+      "title": "D8C9A8",
+      "heading": "B0BFE5",
+      "subheading": "8B9CD0",
+      "accent": "D8B07A",
+      "rule": "4A4458",
+      "table_header_bg": "2A3050",
+      "table_header_fg": "E8E6F0",
+      "table_alt_row_bg": "222230",
+      "table_row_fg": "E8E6F0"
+    }
+  }
+}

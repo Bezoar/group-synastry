@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.2",
+  "description": "Validated reference positions used by behavioral-evals.json. Tolerances in the assertions account for small differences in implementation (e.g., true vs apparent positions, Newcomb vs Newcomb-revised obliquity). The reference subjects ('Alex' and 'Jordan') are fictional test personas with synthetic birth data, chosen to exercise historical-DST resolution (US Central/Mountain zones) the same way the suite always has.",
+
+  "source_schema": {
+    "_doc": "Each chart section may declare a _default_source. Any individual entry that deviates from the default is expressed as {\"value\": ..., \"source\": ...} so the provenance of every reference value is explicit. This convention exists so that a change in one ephemeris source can be traced to exactly the entries it affects, rather than silently shifting values whose provenance was ambiguous.",
+    "codes": {
+      "swisseph_builtin":      "Swiss Ephemeris via pyswisseph 2.10 with Moshier fallback (works without external files). Accuracy: arcsecond-class for major planets, asteroids covered by Swiss Eph built-in.",
+      "swisseph_with_seas18":  "Swiss Ephemeris with the asteroid file seas_18.se1 installed (covers Chiron, Ceres, Pallas, Juno, Vesta with arcsecond/arcminute accuracy 1800-2100). As of skill v1.2 this file is bundled in <skill>/ephe/ and is the required best source for these bodies.",
+      "keplerian_jpl_j2000":   "JPL Small-Body Database J2000 osculating Keplerian elements solved via the skill's lib/kepler.py. ±arcminute for Ceres/Pallas/Juno/Vesta/Eris; ±1-2° for Chiron over multi-decade ranges due to Saturn perturbations.",
+      "keplerian_spec_v1":     "Keplerian elements as documented in the original design spec §8 v1. A Chiron M₀ error in that table (a JPL Horizons query mislabeled as J2000) produces a wrong Chiron position; use keplerian_jpl_j2000 instead. Other bodies' v1 elements are within tolerance.",
+      "derived":               "Computed from other values in this file (midpoints, Davison moment, etc.).",
+      "manual":                "Hand-entered or cross-checked by a human (typically birth data or interpretive flags)."
+    }
+  },
+
+  "computation_notes": {
+    "ephemeris": "Swiss Ephemeris built-in (Moshier fallback for missing files)",
+    "asteroid_method": "Swiss Ephemeris with bundled seas_18.se1 for Chiron/Ceres; JPL Keplerian elements for Eris (no bundled Swiss Eph file for asteroid 136199)",
+    "house_system_default": "Placidus",
+    "ayanamsa_default": "Lahiri",
+    "time_method": "All times converted to UT via IANA zoneinfo before computation",
+    "chiron_note": "Chiron is computed via Swiss Ephemeris with the bundled seas_18.se1 file (arcsecond accuracy 1800-2100), NOT via the Keplerian fallback. The Keplerian path carries ±1-2° error for Chiron over multi-decade ranges (Saturn perturbations), which is large enough to flip close synastry contacts; the bundled-Swiss-Eph value is the truth source for all Chiron reference entries here.",
+    "ceres_note": "Ceres is likewise computed via swisseph_with_seas18. The Keplerian Ceres element set carries larger error than its nominal 'arcminute' claim suggests, so any Ceres-dependent reference contact must be derived from the Swiss-Eph value, not the Keplerian fallback."
+  },
+
+  "people": {
+    "alex": {
+      "birth": {
+        "_default_source": "manual",
+        "date": "1988-06-15",
+        "time_local": "08:20",
+        "tz": "America/Chicago",
+        "tz_offset_at_birth": "-05:00",
+        "ut_datetime": "1988-06-15T13:20:00Z",
+        "julian_day_ut": 2447328.0556,
+        "lat": 41.8781,
+        "lon": -87.6298,
+        "place": "Chicago, IL"
+      },
+      "tropical_natal": {
+        "_default_source": "swisseph_builtin",
+        "Sun":          "24° Gemini 39'",
+        "Moon":         "8° Cancer 29'",
+        "Mercury":      "21° Gemini 02' R",
+        "Venus":        "20° Gemini 37' R",
+        "Mars":         "14° Pisces 57'",
+        "Jupiter":      "22° Taurus 47'",
+        "Saturn":       "29° Sagittarius 37' R",
+        "Uranus":       "29° Sagittarius 15' R",
+        "Neptune":      "9° Capricorn 13' R",
+        "Pluto":        "10° Scorpio 05' R",
+        "Chiron":       {"value": "29° Gemini 27'", "source": "swisseph_with_seas18", "tolerance": "±2 arcmin", "notes": "Computed from seas_18.se1 (bundled). The Keplerian fallback would carry ±1-2° here."},
+        "Lilith_mean":  "3° Virgo 38'",
+        "Ceres":        {"value": "27° Pisces 09'", "source": "swisseph_with_seas18", "tolerance": "±2 arcmin"},
+        "Eris":         {"value": "16° Aries 46'",  "source": "keplerian_jpl_j2000", "tolerance": "±5 arcmin", "notes": "Eris has no bundled Swiss Eph file (no s136199s.se1 without an extra download), so the Keplerian fallback remains best-source for Eris."},
+        "True_Node":    "17° Pisces 48' R",
+        "Ascendant":    "2° Leo 42'",
+        "Midheaven":    "17° Aries 48'",
+        "Vertex":       "19° Sagittarius 07'"
+      },
+      "tropical_aspects_notable": [
+        {"aspect": "Mercury conjunct Venus", "orb": "0°25'", "signs": "Gemini"},
+        {"aspect": "Saturn conjunct Uranus", "orb": "0°22'", "signs": "Sagittarius"},
+        {"aspect": "Saturn opposition Chiron", "orb": "0°09'", "signs": "Sagittarius-Gemini"}
+      ],
+      "vedic_lahiri_natal": {
+        "_default_source": "swisseph_builtin",
+        "ayanamsa_value_at_birth": 23.696,
+        "Sun":     "0° Gemini 57' (Mithuna) — about 23.7° earlier than the tropical position",
+        "Moon":    "14° Gemini 47' (Mithuna) — nakshatra Ardra pada 3, lord Rahu",
+        "Lagna":   "9° Cancer 00' (Karka) — the sidereal rising sign is Cancer, NOT Leo as in the tropical chart"
+      },
+      "vimshottari_dasha_current": {
+        "_default_source": "derived",
+        "birth_mahadasha": "Rahu (Moon in Ardra; ~61% of the Rahu period elapsed at birth)",
+        "mahadasha_active_2026": "Saturn",
+        "mahadasha_period": "approximately 2011-07 to 2030-07"
+      },
+      "profection_2026": {
+        "_default_source": "derived",
+        "age": 38,
+        "house": 3,
+        "sign": "Libra",
+        "lord_of_year": "Venus",
+        "lord_natal_placement": "20° Gemini 37' R, 11th house"
+      },
+      "solar_return_2026": {
+        "_default_source": "swisseph_builtin",
+        "moment_ut": "2026-06-15T17:50Z (± 5 minutes; exact moment the Sun returns to 24°39' Gemini)",
+        "ascendant_at_chicago": "25° Virgo 13' (± 30 arcmin)",
+        "midheaven_at_chicago": "24° Gemini 24' (± 30 arcmin)"
+      }
+    },
+
+    "jordan": {
+      "birth": {
+        "_default_source": "manual",
+        "date": "1991-02-09",
+        "time_local": "14:45",
+        "tz": "America/Denver",
+        "tz_offset_at_birth": "-07:00",
+        "ut_datetime": "1991-02-09T21:45:00Z",
+        "julian_day_ut": 2448297.4062,
+        "lat": 39.7392,
+        "lon": -104.9903,
+        "place": "Denver, CO"
+      },
+      "tropical_natal": {
+        "_default_source": "swisseph_builtin",
+        "Sun":         "20° Aquarius 38'",
+        "Moon":        "26° Sagittarius 47'",
+        "Mercury":     "6° Aquarius 10'",
+        "Venus":       "14° Pisces 34'",
+        "Mars":        "5° Gemini 53'",
+        "Jupiter":     "7° Leo 01' R",
+        "Saturn":      "0° Aquarius 22'",
+        "Uranus":      "11° Capricorn 59'",
+        "Neptune":     "15° Capricorn 34'",
+        "Pluto":       "20° Scorpio 20'",
+        "Chiron":      {"value": "22° Cancer 32' R", "source": "swisseph_with_seas18", "tolerance": "±2 arcmin"},
+        "True_Node":   "27° Capricorn 56'",
+        "Lilith_mean": "21° Sagittarius 40'",
+        "Ceres":       {"value": "2° Scorpio 33'", "source": "swisseph_with_seas18", "tolerance": "±2 arcmin"},
+        "Eris":        {"value": "16° Aries 17'", "source": "keplerian_jpl_j2000", "tolerance": "±5 arcmin", "notes": "Eris remains Keplerian (no bundled Swiss Eph file for asteroid 136199)."},
+        "Ascendant":   "18° Cancer 55'",
+        "Midheaven":   "0° Aries 49'"
+      },
+      "tropical_features_notable": [
+        "Sun-Mercury in Aquarius",
+        "Uranus-Neptune approaching their early-1990s Capricorn conjunction",
+        "Sun square Pluto (orb ~0°18')",
+        "Cancer rising"
+      ]
+    }
+  },
+
+  "synastry_alex_jordan": {
+    "_default_source": "derived",
+    "_chiron_note": "Chiron contacts are derived against Swiss-Eph Chiron values (Alex 29° Gemini 27', Jordan 22° Cancer 32' R). Any Chiron contact computed via the Keplerian fallback would shift by up to ±1-2° and could form or break spuriously; only the Swiss-Eph-derived contacts are correct.",
+    "tightest_aspects": [
+      {"aspect": "Alex Venus trine Jordan Sun",          "orb": "0°02'", "depends_on": ["swisseph_builtin"]},
+      {"aspect": "Alex Mercury sesquisquare Jordan Mercury", "orb": "0°08'", "depends_on": ["swisseph_builtin"]},
+      {"aspect": "Alex Ascendant square Jordan Ceres",   "orb": "0°09'", "depends_on": ["swisseph_with_seas18", "swisseph_builtin"]},
+      {"aspect": "Alex Jupiter sextile Jordan Chiron",   "orb": "0°15'", "depends_on": ["swisseph_with_seas18", "swisseph_builtin"]},
+      {"aspect": "Alex Venus quincunx Jordan Pluto",     "orb": "0°17'", "depends_on": ["swisseph_builtin"]},
+      {"aspect": "Alex Ceres square Jordan Moon",        "orb": "0°22'", "depends_on": ["swisseph_with_seas18", "swisseph_builtin"]},
+      {"aspect": "Alex Mars conjunct Jordan Venus",      "orb": "0°23'", "depends_on": ["swisseph_builtin"]},
+      {"aspect": "Alex Mercury trine Jordan Sun",        "orb": "0°24'", "depends_on": ["swisseph_builtin"]},
+      {"aspect": "Alex Eris conjunct Jordan Eris",       "orb": "0°30'", "depends_on": ["keplerian_jpl_j2000"]},
+      {"aspect": "Alex Saturn semisextile Jordan Saturn", "orb": "0°45'", "depends_on": ["swisseph_builtin"]},
+      {"aspect": "Alex Sun trine Jordan Sun",            "orb": "4°00'", "depends_on": ["swisseph_builtin"]}
+    ]
+  },
+
+  "composite_alex_jordan_midpoint": {
+    "_default_source": "derived",
+    "_convention_note": "Spec §16 mandates the shorter-arc midpoint rule; the implementation in <skill>/scripts/composite.py uses shorter-arc. Houses are equal-house from the composite Ascendant.",
+    "Sun":       "22° Aries 39'",
+    "Moon":      "2° Libra 38'",
+    "Ascendant": "25° Cancer 48'",
+    "Midheaven": "9° Aries 18'",
+    "Saturn":    "14° Capricorn 59'",
+    "Ceres":     "14° Capricorn 51'",
+    "tightest_internal": [
+      {"aspect": "Moon quincunx Venus",   "orb": "0°03'", "depends_on": ["swisseph_builtin"]},
+      {"aspect": "Saturn conjunct Ceres", "orb": "0°08'", "signs": "Capricorn", "depends_on": ["swisseph_with_seas18", "swisseph_builtin"]},
+      {"aspect": "Saturn sextile Pluto",  "orb": "0°13'", "depends_on": ["swisseph_builtin"]}
+    ]
+  },
+
+  "davison_alex_jordan": {
+    "_default_source": "swisseph_builtin",
+    "moment": {
+      "date": "1989-10-13",
+      "time_local": "approximately 23:32 (preceding day, local)",
+      "ut_datetime": "1989-10-13T05:32:30Z",
+      "lat": 41.1353,
+      "lon": -96.4510,
+      "place": "Temporal+spatial midpoint of Chicago and Denver (eastern Nebraska)"
+    },
+    "Sun":       "19° Libra 52'",
+    "Moon":      "26° Pisces 46'",
+    "Ascendant": "25° Cancer 53'",
+    "Midheaven": "9° Aries 03'"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "group-synastry",
+  "version": "0.2.0",
+  "description": "Compute detailed Western tropical natal, synastry, composite, and Davison charts for a private group database. Renders to Markdown, .docx (Node + docx-js), and .pdf (LibreOffice headless). Bundles Swiss Ephemeris seas_18.se1 for arcminute Chiron/Ceres precision.",
+  "author": {
+    "name": "Mark Welch",
+    "email": "mwpdx.ai@proton.me"
+  },
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "astrology",
+    "synastry",
+    "birth-chart",
+    "ephemeris",
+    "swiss-ephemeris",
+    "composite-chart",
+    "davison"
+  ]
+}

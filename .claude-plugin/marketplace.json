@@ -1,0 +1,14 @@
+{
+  "name": "group-synastry-marketplace",
+  "owner": {
+    "name": "Mark Welch",
+    "email": "mwpdx.ai@proton.me"
+  },
+  "plugins": [
+    {
+      "name": "group-synastry",
+      "source": "./plugins/group-synastry",
+      "description": "Astrological birth charts, synastry, and composite/Davison charts for a small private group across multiple systems (Western tropical built; Vedic, Hellenistic, BaZi, predictive deferred to later phases)."
+    }
+  ]
+}
