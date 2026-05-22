@@ -1,0 +1,20 @@
+# Private-only test data — the real reference birth charts.
+#
+# `export-ignore` makes `git archive` omit these paths. The public mirror is
+# built with `git archive`, so these files are dropped from every public
+# snapshot automatically — "sync upstream = take all but the private data"
+# requires no filtering logic. They remain tracked (and tested) in the private
+# repo. The matching tests skip when the fixture is absent, so a public
+# checkout's suite stays green.
+#
+# Convention: any private-only data uses a `*private*` name and gets an
+# export-ignore line here. (This file itself IS synced — keep it free of real
+# names/dates/places so the public mirror stays clean.)
+plugins/group-synastry/skills/group-synastry/tests/fixtures/people_private.json export-ignore
+plugins/group-synastry/skills/group-synastry/tests/test_private_charts.py        export-ignore
+evals/reference-charts.private.json                                              export-ignore
+evals/behavioral-evals.private.json                                              export-ignore
+
+# Private-only maintainer tooling (the private→public sync recipe + script).
+SYNC.md                                                                          export-ignore
+sync-to-public.sh                                                                export-ignore
