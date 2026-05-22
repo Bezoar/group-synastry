@@ -4,7 +4,84 @@ A Claude skill for computing detailed astrological birth charts and synastry/com
 
 ## Status
 
-**Phases 1 & 2 built.** Western tropical natal + synastry + composite + Davison + Markdown (Phase 1) plus `.docx` (via Node + docx-js) and `.pdf` (via LibreOffice headless) rendering (Phase 2). 103/103 tests passing. See `plugins/group-synastry/skills/group-synastry/README.md` for install + run instructions and `plugins/group-synastry/skills/group-synastry/SKILL.md` for the behavior contract. Phases 3–6 (Vedic/Hellenistic/BaZi, predictive, group ops, polish) remain deferred per spec §11.
+**Phases 1 & 2 built.** Western tropical natal + synastry + composite + Davison + Markdown (Phase 1) plus `.docx` (via Node + docx-js) and `.pdf` (via LibreOffice headless) rendering (Phase 2). See `plugins/group-synastry/skills/group-synastry/README.md` for run instructions and `plugins/group-synastry/skills/group-synastry/SKILL.md` for the behavior contract. Phases 3–6 (Vedic/Hellenistic/BaZi, predictive, group ops, polish) remain deferred per spec §11.
+
+## Install
+
+This repository is a **Claude Code plugin marketplace**. From a Claude Code
+session, register the marketplace, then install the skill from it:
+
+```
+/plugin marketplace add Bezoar/group-synastry
+/plugin install group-synastry@group-synastry-marketplace
+```
+
+- The first command points Claude Code at this repo's
+  `.claude-plugin/marketplace.json`.
+- The second installs the `group-synastry` skill (the
+  `@group-synastry-marketplace` suffix names the marketplace it came from). You
+  can also run `/plugin` with no arguments to browse and install interactively.
+
+After installing, **just ask for a chart** — e.g. *"add me to my group and show
+my natal chart."* On first use the skill runs a dependency check
+(`scripts/check_env.py`) and walks you through installing its one required
+Python package (`pyswisseph`), asking before it changes anything on your
+machine. Optional `.docx` / `.pdf` output needs Node and LibreOffice
+respectively; the skill offers those only when you request that format and
+otherwise falls back to Markdown. See the
+[skill README](plugins/group-synastry/skills/group-synastry/README.md) for full
+setup and dependency details.
+
+## Usage
+
+You drive the skill by **talking to Claude in plain language** — it runs the
+underlying scripts for you and asks before anything ambiguous or irreversible.
+
+### Managing people
+
+The skill keeps a small private database of birth data (`people.json`, stored
+locally, never committed). Just ask:
+
+- *"Add Sam to my group — born March 3, 1990 at 7:15 AM in Seattle."*
+- *"List everyone in my group."* · *"Show Sam's details."*
+- *"Update Sam's birth time to 7:45 AM."* · *"Remove Sam from the group."*
+
+Claude prompts for anything missing. A birth **date** is required; an exact
+**time** and **place** are needed for the Ascendant, Midheaven, and houses.
+Timezones are stored as IANA names (e.g. `America/Los_Angeles`), so historical
+daylight-saving is handled correctly. If a birth time is unknown, the skill
+still computes planet positions but tells you the angles and houses are
+unavailable.
+
+### Managing cohorts
+
+Cohorts are named groups — a family, a friend circle — that you collect lore
+about over time. Ask:
+
+- *"Create a cohort called Lumina with Sam, Alex, and Jordan."*
+- *"Add Riley to Lumina."* · *"Make Lumina my active cohort."*
+- *"Who's in Lumina?"*
+
+When a cohort is active, charts are filed under that cohort's folder, and
+free-form observations live in `cohorts/<id>/notes.md` — a shareable file,
+while the birth-data database stays private. A person can belong to more than
+one cohort.
+
+### Charts you can ask for
+
+| Chart | What it is | Example ask |
+|---|---|---|
+| **Natal** | one person's birth chart | *"Show my natal chart."* |
+| **Synastry** | how two people relate, chart-to-chart | *"How do Sam and Alex get along, chart-wise?"* |
+| **Composite (midpoint)** | the relationship's own "third chart" | *"Make the composite for Sam and Alex."* |
+| **Davison** | a real chart cast at the midpoint in time *and* place of two births | *"Do the Davison for Sam and Alex."* |
+| **Time-range variants** | several charts across an uncertain birth-time window | *"Sam's birth time is fuzzy — show the range of possibilities."* |
+
+For any chart you can choose the **output format** — inline Markdown (default),
+`.docx`, or `.pdf` — and the **interpretation depth**: none (just the data),
+brief, or full written analysis. Claude offers these if you don't say. Every
+natal and synastry chart always includes the Sun through Pluto plus Chiron,
+Black Moon Lilith, Ceres, Eris, the lunar nodes, and the Ascendant/Midheaven.
 
 ## Repository Layout
 

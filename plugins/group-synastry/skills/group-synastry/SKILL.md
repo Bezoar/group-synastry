@@ -42,7 +42,39 @@ choices haven't already been specified. Defaults exist as fallbacks for
 and default the rest with a brief inline note ("I'll use Placidus and
 inline markdown unless you say otherwise").
 
+## Dependencies (preflight)
+
+The scripts need `pyswisseph` (required for every chart) and, for richer
+output, Node + a project `npm install` (`.docx`) and LibreOffice (`.pdf`).
+**Run the dependency check once at the start of a charting session** — not
+every turn — and remember the result:
+
+```bash
+python scripts/check_env.py
+```
+
+It prints a per-item table, the exact install command for anything missing,
+and a final `SUMMARY core_ok=true|false …` line. Act on it as follows:
+
+- **Core missing (`pyswisseph` or Python < 3.10) — this blocks all charts.**
+  - On **Claude.ai** (the check prints `Environment: Claude.ai sandbox`): the
+    sandbox is ephemeral, so just install it — `python -m pip install -r
+    requirements.txt` — no need to ask.
+  - On **Claude Code** (local machine): tell the user it's needed, show the
+    command from the check's output, **ask for confirmation, then install.**
+    Installing packages changes their machine — don't do it silently.
+- **Optional missing (Node / `node_modules` / LibreOffice).** Do *nothing*
+  unless the user actually wants that format. When they request `.docx`/`.pdf`
+  and the dep is absent, **explain and offer the choice**: install it (show the
+  command; for system installs like LibreOffice via `brew`/`apt`, always ask),
+  or take the fallback — Markdown if `.docx` can't render, `.docx` if `.pdf`
+  can't. Never block a chart on an optional dependency.
+- If a script ever fails with a `pyswisseph`-not-installed error, you skipped
+  the preflight — run `check_env.py` and handle as above.
+
 ## How invocations flow
+
+0. **Preflight** per §"Dependencies" above, once per session.
 
 1. **Detect environment.** `scripts/lib/env.py` → `data_dir()` returns the
    right database path: `~/.config/group-synastry/people.json` in Claude
@@ -431,6 +463,8 @@ If the user asks for any of these, say what's available now (Phase 1
 
 | Goal | Command |
 |---|---|
+| Check dependencies (preflight) | `python scripts/check_env.py` (add `--json` for machine output) |
+| Install the core Python dep | `python -m pip install -r requirements.txt` |
 | Show DB path | `python scripts/db.py path` |
 | List people | `python scripts/db.py list` |
 | Show one person | `python scripts/db.py show <id>` |

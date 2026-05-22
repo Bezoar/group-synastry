@@ -430,7 +430,7 @@ A skill that consistently misses by 30+ arcminutes is doing something fundamenta
 - **Interpretation persistence tests** — `test_interpretation_persistence.py`. Cover the `--interpretation` flag on chart scripts, sidecar emission, the round-trip parser.
 - **Eval suite** (`/evals`) — broader behavioral and trigger evals; see `evals/README.md`.
 
-Current count: **55 tests** total (53 fast + 2 soffice-bound). Renderer tests skip cleanly on machines without their dependencies, so CI on a barebones runner won't false-fail.
+Renderer tests skip cleanly on machines without their dependencies, so CI on a barebones runner won't false-fail. (Run `pytest tests/ -q` for the current count rather than relying on a number here — it changes with every feature.)
 
 ## 13. Marketplace install and dev setup
 
@@ -441,11 +441,25 @@ Current count: **55 tests** total (53 fast + 2 soffice-bound). Renderer tests sk
 /plugin install group-synastry
 ```
 
-Then in the Python that Claude Code invokes:
+Dependencies are then handled by a **preflight doctor** rather than manual
+steps. `scripts/check_env.py` probes (tiered): Python ≥3.10 + `pyswisseph`
+(**core** — blocks all charts), Node + project `node_modules` (`.docx`) and
+LibreOffice (`.pdf`) (**optional** — degrade, never block), and the bundled
+`seas_18.se1` (**info**). It prints per-gap install commands (targeting the
+active interpreter via `sys.executable -m pip`), a parseable `SUMMARY` line,
+and exits non-zero iff a core dep is missing. `requirements.txt` pins the one
+required package; `lib/ephem.py` wraps `import swisseph` so a missing package
+yields an actionable message instead of a bare traceback.
+
+Per SKILL.md §"Dependencies", the skill runs the doctor once per session and:
+installs core silently in the ephemeral Claude.ai sandbox but **asks first on a
+local machine**; for optional deps, acts only on explicit format requests and
+otherwise falls back (Markdown ← `.docx` ← `.pdf`). Manual equivalents:
 
 ```bash
-pip install pyswisseph>=2.10
-cd <skill> && npm install      # for .docx
+python scripts/check_env.py                  # report status + commands
+python -m pip install -r requirements.txt    # core (pyswisseph)
+cd <skill> && npm install                    # for .docx
 # LibreOffice install required for .pdf — see <skill>/README.md
 ```
 

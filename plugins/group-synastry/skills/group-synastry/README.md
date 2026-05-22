@@ -7,17 +7,24 @@ synastry + composite + Davison, with Markdown / `.docx` / `.pdf` output.
 ## Install (Claude Code)
 
 This skill ships as part of a Claude Code plugin marketplace. From a
-Claude Code session:
+Claude Code session, add the marketplace and install the plugin:
 
 ```
-/plugin marketplace add /path/to/group-synastry-private
-/plugin install group-synastry
+/plugin marketplace add Bezoar/group-synastry
+/plugin install group-synastry@group-synastry-marketplace
 ```
 
-You also need `pyswisseph` on the Python that Claude Code invokes:
+(During local development you can instead point the first command at a clone:
+`/plugin marketplace add /path/to/group-synastry`.)
+
+**You usually don't need to install anything by hand** — just ask for a chart
+and the skill runs a dependency check (`scripts/check_env.py`), then guides you
+through any missing pieces (asking before it installs on your machine). To
+check or set up manually:
 
 ```bash
-pip install pyswisseph>=2.10
+python scripts/check_env.py            # report what's present / missing + commands
+python -m pip install -r requirements.txt   # the one required package (pyswisseph)
 ```
 
 For `.docx` / `.pdf` output (Phase 2), install the Node-side dependency
@@ -83,11 +90,10 @@ cd plugins/group-synastry/skills/group-synastry
 python -m pytest tests/ -q
 ```
 
-37 tests should pass (32 chart/DB/synastry + 4 .docx renderer + 1 .pdf
-renderer). The renderer tests skip automatically if Node and/or
+The suite should pass. The renderer tests skip automatically if Node and/or
 LibreOffice are not installed. The chart tests validate natal positions
-for the canonical reference subjects (Alex, born 1988-06-15 Chicago OH;
-Jordan, born 1991-02-09 Denver OH) against Swiss Ephemeris reference values
+for the canonical reference subjects (Alex, born 1988-06-15 Chicago IL;
+Jordan, born 1991-02-09 Denver CO) against Swiss Ephemeris reference values
 within ±1–10 arcminutes (looser tolerance for asteroid Keplerian
 fallback and angle calculations).
 

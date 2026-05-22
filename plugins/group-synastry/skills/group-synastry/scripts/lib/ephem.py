@@ -21,7 +21,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-import swisseph as swe
+try:
+    import swisseph as swe
+except ModuleNotFoundError as exc:  # pragma: no cover - exercised only when the dep is absent
+    raise ModuleNotFoundError(
+        "The 'pyswisseph' package is required but not installed. Install it with:\n"
+        "    python -m pip install -r requirements.txt\n"
+        "(run scripts/check_env.py from the skill directory for a full dependency check)."
+    ) from exc
 
 from . import env, kepler
 
