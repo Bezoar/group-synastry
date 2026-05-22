@@ -1,0 +1,7 @@
+# Python dependencies for the group-synastry skill.
+# Install:  python -m pip install -r requirements.txt
+# Or run:   python scripts/check_env.py   (reports what's missing + the command)
+#
+# Only one third-party package is required; everything else is Python 3.10+
+# stdlib (zoneinfo, datetime, json, math, pathlib).
+pyswisseph>=2.10
