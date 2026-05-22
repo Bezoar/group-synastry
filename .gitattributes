@@ -18,3 +18,4 @@ evals/behavioral-evals.private.json                                             
 # Private-only maintainer tooling (the private→public sync recipe + script).
 SYNC.md                                                                          export-ignore
 sync-to-public.sh                                                                export-ignore
+docs/generated									 export-ignore
