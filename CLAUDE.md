@@ -14,6 +14,8 @@ The plugin layout — `plugins/group-synastry/skills/group-synastry/` — is ref
 
 **CRITICAL: when editing any file in docs/specs, if there is a file in this repo called docs/instructions/editing-specs.md, ALWAYS read and follow the instructions there.**
 
+**When pushing an upstream sync PR to the public mirror, if `docs/instructions/upstream.md` is present, read and follow it** — it covers composing the scrubbed public PR description from the constituent private PRs.
+
 - **`docs/specs/primary.md` — the authoritative current-state spec.** Read this first; it covers what the repo does, how the code is organized, and the load-bearing design decisions with rationale. Update it when behavior changes.
 - `docs/archive/original-spec/spec.md` — the **original** Phase 1 design spec. Frozen, historical, and now **fully superseded** by `docs/specs/primary.md` (its decision log D1–D9, user stories, edge cases, and algorithmic references have all been folded into the primary spec). You shouldn't need to open it; treat `docs/specs/primary.md` as the single source of truth.
 - `<skill>/SKILL.md` — the behavior contract the skill follows at runtime (clarify-first, pick-and-choose, edge-case table, interpretation workflow). Changes here change skill behavior.
@@ -52,6 +54,8 @@ python plugins/group-synastry/skills/group-synastry/scripts/synastry.py alex jor
 ```
 
 All chart/synastry/composite scripts accept `--json` (structured output for programmatic use) and `--house-system {placidus,koch,whole-sign,equal,porphyry,regiomontanus,campanus}`.
+
+**To render unattended (no permission prompt):** invoke a script as a plain literal command — `.venv/bin/python plugins/group-synastry/skills/group-synastry/scripts/render_pdf.py -i chart.json -o out.pdf` — *not* wrapped in a shell variable (`PY=…; $PY …`), `&&` chain, or pipe. The `Bash(.venv/bin/python *)` allow rule is a **prefix match on the literal command**, so variable indirection defeats it and forces a prompt. Read chart JSON from a file with `-i FILE` rather than piping `chart.py --json | render_*.py`.
 
 Tests bring their own fixture (`<skill>/tests/fixtures/people_test.json`, gitignored) — they do not touch the user's real `people.json`.
 
