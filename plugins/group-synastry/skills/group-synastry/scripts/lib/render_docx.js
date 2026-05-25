@@ -197,10 +197,18 @@ function buildTable(headers, rows, style) {
 
 function formatPos(entry) {
   const signGlyph = SIGN_GLYPHS[entry.sign] || '';
-  let pos = `${entry.degree}° ${signGlyph} ${entry.sign} ${String(entry.minute).padStart(2, '0')}'`;
+  const sec = String(entry.second != null ? entry.second : 0).padStart(2, '0');
+  let pos = `${entry.degree}° ${signGlyph} ${entry.sign} ${String(entry.minute).padStart(2, '0')}' ${sec}"`;
   if (entry.retrograde) pos += ' R';
   return pos;
 }
+
+// Per-source accuracy of the positions shown; mirrors render_md.ACCURACY_NOTE.
+const ACCURACY_NOTE =
+  'Positions are shown to the arc-second. By source: Sun, planets, lunar nodes and Lilith — ' +
+  'Swiss Ephemeris (Moshier), better than 1″ (Moon ≈3″); Chiron and Ceres — bundled seas_18, ' +
+  '≈ arc-second; Eris — Keplerian elements (marked * where sources are shown), reliable to the ' +
+  'arc-minute only, so its arc-seconds are not significant.';
 
 function bodyLabel(name) {
   const g = PLANET_GLYPHS[name];
@@ -488,14 +496,7 @@ function renderNatal(chart, style) {
   ]);
   children.push(buildTable(['Body', 'Position', 'House'], planetRows, style));
 
-  if ((chart.planets || []).some((p) => isKeplerianSource(p.source))) {
-    children.push(bodyPara(
-      '* Computed via bundled Keplerian elements (Swiss Ephemeris asteroid file unavailable). ' +
-      'Accuracy: ±arcminutes for Ceres/Eris; ±1–2° for Chiron because Saturn perturbations preclude ' +
-      'better single-element-set fits over multi-decade ranges.',
-      style, { italics: true }
-    ));
-  }
+  children.push(bodyPara(ACCURACY_NOTE, style, { italics: true }));
 
   if (chart.aspects && chart.aspects.length) {
     children.push(heading('Notable Aspects', 1, style));
@@ -538,6 +539,8 @@ function renderSynastry(rpt, style) {
     }
     children.push(buildTable(['Body', 'Position'], rows, style));
   }
+
+  children.push(bodyPara(ACCURACY_NOTE, style, { italics: true }));
 
   children.push(heading('Cross-aspects (tightest first)', 1, style));
   const top = (rpt.aspects || []).slice(0, 30);
@@ -592,6 +595,7 @@ function renderComposite(comp, style) {
     ]),
     style,
   ));
+  children.push(bodyPara(ACCURACY_NOTE, style, { italics: true }));
 
   if (comp.aspects && comp.aspects.length) {
     children.push(heading('Internal Aspects (tightest first)', 1, style));

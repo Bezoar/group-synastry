@@ -23,11 +23,11 @@ from typing import Optional
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from lib import ephem, formatting  # type: ignore[import-not-found]
+    from lib import ephem, formatting, settings  # type: ignore[import-not-found]
     from lib.tz import to_julian_day_ut  # type: ignore[import-not-found]
     import db, chart as chart_mod  # type: ignore[import-not-found]
 else:
-    from .lib import ephem, formatting
+    from .lib import ephem, formatting, settings
     from .lib.tz import to_julian_day_ut
     from . import db
     from . import chart as chart_mod
@@ -65,7 +65,7 @@ class CompositeChart:
 
 
 def _make_point(name: str, lon: float, house: Optional[int] = None) -> CompositePoint:
-    p = formatting.split_longitude(lon)
+    p = formatting.split_longitude_exact(lon)
     return CompositePoint(name, lon, p.sign, p.degree, p.minute, p.second, house)
 
 
@@ -189,7 +189,11 @@ def _main(argv: Optional[list[str]] = None) -> int:
         s = sub.add_parser(name)
         s.add_argument("ident_a")
         s.add_argument("ident_b")
-        s.add_argument("--house-system", default="placidus")
+        s.add_argument(
+            "--house-system",
+            default=None,
+            help="house system (default: settings.default_house_system, else placidus)",
+        )
         s.add_argument("--json", action="store_true")
         s.add_argument(
             "--interpretation",
@@ -206,10 +210,11 @@ def _main(argv: Optional[list[str]] = None) -> int:
             if not p:
                 print(f"Person not found: {ident}", file=sys.stderr)
         return 1
+    house_system = args.house_system or settings.default_house_system()
     if args.cmd == "midpoint":
-        report = midpoint_composite(a, b, house_system=args.house_system)
+        report = midpoint_composite(a, b, house_system=house_system)
     else:
-        report = davison(a, b, house_system=args.house_system)
+        report = davison(a, b, house_system=house_system)
     if args.json:
         print(json.dumps(asdict(report), indent=2, ensure_ascii=False, default=str))
         return 0

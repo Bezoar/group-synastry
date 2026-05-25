@@ -19,6 +19,18 @@ else:
     from . import composite as composite_mod
 
 
+# Per-source accuracy of the positions shown. Bodies use a strict best-source
+# policy (lib/ephem.py); the figures are each source's documented precision.
+# Charts print arc-seconds, so this tells the reader how far to trust them.
+ACCURACY_NOTE = (
+    "Positions are shown to the arc-second. By source: Sun, planets, lunar "
+    "nodes and Lilith — Swiss Ephemeris (Moshier), better than 1″ (Moon ≈3″); "
+    "Chiron and Ceres — bundled `seas_18`, ≈ arc-second; Eris — Keplerian "
+    "elements (marked \\* where sources are shown), reliable to the arc-minute "
+    "only, so its arc-seconds are not significant."
+)
+
+
 def render_interpretation(interpretation: Optional[dict]) -> str:
     """Render an interpretation block (``{"sections": [...]}``) as markdown.
 
@@ -45,12 +57,12 @@ def render_interpretation(interpretation: Optional[dict]) -> str:
 
 def _planet_row(p: chart_mod.PlanetEntry) -> str:
     glyph = formatting.PLANET_GLYPHS.get(p.name, "")
-    sign_glyph = formatting.GLYPHS.get(p.sign, "")
-    pos = f"{p.degree}° {sign_glyph} {p.sign} {p.minute:02d}'"
-    if p.retrograde:
-        pos += " R"
+    pos = formatting.format_position_glyph(p.longitude, p.retrograde)
     house = f"{p.house}" if p.house else "—"
-    src = "" if p.source == "swisseph" else " *"
+    # Flag only bodies computed via the Keplerian fallback (lower accuracy);
+    # the source codes are the specific ones from lib/ephem (swisseph_builtin /
+    # swisseph_with_seas18 / keplerian_jpl_j2000), so test the prefix.
+    src = " *" if p.source.startswith("keplerian") else ""
     return f"| {glyph} {p.name}{src} | {pos} | {house} |"
 
 
@@ -72,8 +84,7 @@ def render_natal(chart: chart_mod.NatalChart) -> str:
         lines.append("| Angle | Position |")
         lines.append("|---|---|")
         for a in chart.angles:
-            sign_glyph = formatting.GLYPHS.get(a.sign, "")
-            lines.append(f"| {a.name} | {a.degree}° {sign_glyph} {a.sign} {a.minute:02d}' |")
+            lines.append(f"| {a.name} | {formatting.format_position_glyph(a.longitude)} |")
         lines.append("")
 
     lines.append("## Planets and Points")
@@ -84,15 +95,8 @@ def render_natal(chart: chart_mod.NatalChart) -> str:
         lines.append(_planet_row(p))
     lines.append("")
 
-    if any(p.source == "keplerian" for p in chart.planets):
-        lines.append(
-            "\\* Computed via bundled Keplerian elements (Swiss Ephemeris asteroid "
-            "file unavailable). Accuracy: ±arcminutes for Ceres/Eris; **±1–2° for "
-            "Chiron** because Saturn perturbations preclude better single-element-set "
-            "fits over multi-decade ranges. For arcminute Chiron precision, install "
-            "`seas_18.se1` from astro.com (see skill/README.md)."
-        )
-        lines.append("")
+    lines.append(f"_{ACCURACY_NOTE}_")
+    lines.append("")
 
     if chart.aspects:
         lines.append("## Notable Aspects")
@@ -130,19 +134,18 @@ def render_synastry(report: synastry_mod.SynastryReport) -> str:
         lines.append("| Body | Position |")
         lines.append("|---|---|")
         for p in ch["planets"]:
-            sign_glyph = formatting.GLYPHS.get(p["sign"], "")
-            pos = f"{p['degree']}° {sign_glyph} {p['sign']} {p['minute']:02d}'"
-            if p["retrograde"]:
-                pos += " R"
+            pos = formatting.format_position_glyph(p["longitude"], p["retrograde"])
             lines.append(f"| {p['name']} | {pos} |")
         if ch["angles"]:
             for a in ch["angles"]:
                 if a["name"] in ("Ascendant", "Midheaven"):
-                    sign_glyph = formatting.GLYPHS.get(a["sign"], "")
                     lines.append(
-                        f"| {a['name']} | {a['degree']}° {sign_glyph} {a['sign']} {a['minute']:02d}' |"
+                        f"| {a['name']} | {formatting.format_position_glyph(a['longitude'])} |"
                     )
         lines.append("")
+
+    lines.append(f"_{ACCURACY_NOTE}_")
+    lines.append("")
 
     # Cross-aspects table — top 30 by orb tightness
     lines.append("## Cross-aspects (tightest first)")
@@ -196,8 +199,7 @@ def render_composite(comp: composite_mod.CompositeChart) -> str:
         lines.append("| Angle | Position |")
         lines.append("|---|---|")
         for a in comp.angles:
-            sign_glyph = formatting.GLYPHS.get(a.sign, "")
-            lines.append(f"| {a.name} | {a.degree}° {sign_glyph} {a.sign} {a.minute:02d}' |")
+            lines.append(f"| {a.name} | {formatting.format_position_glyph(a.longitude)} |")
         lines.append("")
 
     lines.append("## Bodies")
@@ -205,10 +207,11 @@ def render_composite(comp: composite_mod.CompositeChart) -> str:
     lines.append("| Body | Position | House |")
     lines.append("|---|---|---|")
     for p in comp.points:
-        sign_glyph = formatting.GLYPHS.get(p.sign, "")
-        pos = f"{p.degree}° {sign_glyph} {p.sign} {p.minute:02d}'"
+        pos = formatting.format_position_glyph(p.longitude)
         house = f"{p.house}" if p.house else "—"
         lines.append(f"| {p.name} | {pos} | {house} |")
+    lines.append("")
+    lines.append(f"_{ACCURACY_NOTE}_")
     lines.append("")
 
     if comp.aspects:

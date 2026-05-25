@@ -1,6 +1,6 @@
 """IANA timezone resolution.
 
-Per spec D7 / eval 1: timezone abbreviations like 'EDT', 'PST' must be rejected
+Per the primary spec §5.3 (decision D7): timezone abbreviations like 'EDT', 'PST' must be rejected
 and the user pointed at the IANA name. zoneinfo handles historical DST
 correctly when given a real IANA zone name plus a wall-clock datetime.
 """
@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 # Common abbreviations users type. We reject these so the skill can prompt for
-# the IANA equivalent (per spec §14 edge-case table).
+# the IANA equivalent (per the primary spec §15 edge-case table).
 ABBREVIATION_HINTS = {
     "EDT": "America/New_York",
     "EST": "America/New_York",

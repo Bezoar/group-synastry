@@ -14,10 +14,10 @@ from typing import Optional
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from lib import ephem, formatting  # type: ignore[import-not-found]
+    from lib import ephem, formatting, settings  # type: ignore[import-not-found]
     import db, chart as chart_mod  # type: ignore[import-not-found]
 else:
-    from .lib import ephem, formatting
+    from .lib import ephem, formatting, settings
     from . import db
     from . import chart as chart_mod
 
@@ -144,7 +144,11 @@ def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Synastry between two people.")
     parser.add_argument("ident_a")
     parser.add_argument("ident_b")
-    parser.add_argument("--house-system", default="placidus")
+    parser.add_argument(
+        "--house-system",
+        default=None,
+        help="house system (default: settings.default_house_system, else placidus)",
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--interpretation",
@@ -162,7 +166,8 @@ def _main(argv: Optional[list[str]] = None) -> int:
         for m in missing:
             print(f"Person not found: {labels[m]}", file=sys.stderr)
         return 1
-    report = compute_synastry(a, b, house_system=args.house_system)
+    house_system = args.house_system or settings.default_house_system()
+    report = compute_synastry(a, b, house_system=house_system)
     if args.json:
         print(json.dumps(asdict(report), indent=2, ensure_ascii=False, default=str))
         return 0

@@ -46,11 +46,14 @@ class PlanetEntry:
     retrograde: bool
     speed: float
     house: Optional[int]
-    source: str             # "swisseph" | "keplerian"
+    source: str             # specific lib/ephem code: swisseph_builtin |
+                            # swisseph_with_seas18 | keplerian_jpl_j2000 |
+                            # "composite" (composite points). Renderers test
+                            # `.startswith("keplerian")` to flag the fallback.
 
     @classmethod
     def from_position(cls, pos: ephem.BodyPosition, house: Optional[int]) -> "PlanetEntry":
-        p = formatting.split_longitude(pos.longitude)
+        p = formatting.split_longitude_exact(pos.longitude)
         return cls(
             name=pos.name,
             longitude=pos.longitude,
@@ -71,7 +74,7 @@ class AngleEntry:
 
     @classmethod
     def from_longitude(cls, name: str, lon: float) -> "AngleEntry":
-        p = formatting.split_longitude(lon)
+        p = formatting.split_longitude_exact(lon)
         return cls(name, lon, p.sign, p.degree, p.minute, p.second)
 
 
@@ -132,13 +135,10 @@ def compute_natal(person: dict, house_system: str = "placidus") -> NatalChart:
         angles = []
         cusps_list = []
 
-    fallback_bodies: list[str] = []
     for name in NATAL_BODIES:
         pos = ephem.calc_body(conv.julian_day_ut, name)
         house = ephem.assign_house(pos.longitude, cusps_tuple) if cusps_tuple else None
         planets.append(PlanetEntry.from_position(pos, house))
-        if pos.source == "keplerian":
-            fallback_bodies.append(name)
 
     # Synthetic South Node (always derived from True Node)
     tn = next((p for p in planets if p.name == "True Node"), None)
@@ -147,13 +147,6 @@ def compute_natal(person: dict, house_system: str = "placidus") -> NatalChart:
         sn_pos = ephem.BodyPosition("South Node", sn_lon, -tn.speed, tn.source)
         house = ephem.assign_house(sn_lon, cusps_tuple) if cusps_tuple else None
         planets.append(PlanetEntry.from_position(sn_pos, house))
-
-    if fallback_bodies:
-        notes.append(
-            "Bodies computed via bundled Keplerian elements (no Swiss Ephemeris "
-            f"asteroid file available): {', '.join(fallback_bodies)}. "
-            "Accuracy is ~arcminutes for Ceres/Eris and degree-scale for Chiron."
-        )
 
     # Aspects between bodies (and to angles when angles available)
     aspect_targets = list(planets)

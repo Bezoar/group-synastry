@@ -182,4 +182,4 @@ A skill that consistently misses by 30+ arcminutes is doing something fundamenta
 
 ---
 
-*For the spec this eval suite tests against, see [`docs/specs/primary.md`](../docs/specs/primary.md) (current state) and [`docs/spec.md`](../docs/spec.md) (original Phase 1 design, frozen).*
+*For the spec this eval suite tests against, see [`docs/specs/primary.md`](../docs/specs/primary.md) — the authoritative current-state spec. (The original Phase 1 design spec is archived at `docs/archive/original-spec/spec.md` but is fully superseded; primary.md is the source of truth.)*

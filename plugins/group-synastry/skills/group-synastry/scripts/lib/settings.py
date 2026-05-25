@@ -1,10 +1,11 @@
 """User preferences persisted to ``settings.json``.
 
-Stores cross-session defaults set by the user (eval 18 / spec §9.4) so the
-skill doesn't re-ask the same clarifying question every time. The file lives
+Stores cross-session defaults set by the user (eval 18 / primary spec §4.1) so
+the skill doesn't re-ask the same clarifying question every time. The file lives
 next to ``people.json`` (see ``env.settings_json_path``).
 
-Schema (v1)::
+The authoritative set of recognized keys is ``KNOWN_KEYS`` below (documented in
+primary spec §8); the block here is just an illustrative shape::
 
     {
       "version": 1,
