@@ -106,6 +106,23 @@ and a final `SUMMARY core_ok=true|false …` line. Act on it as follows:
      python scripts/render_pdf.py --output syn-alex-jordan.pdf
    ```
 
+7. **Invoke scripts as plain, literal commands so they run unattended.** Use the
+   literal interpreter + path (`python scripts/chart.py natal alex`) — never wrap
+   a skill command in a shell variable (`PY=python; "$PY" …`), an `&&` chain, or
+   `$(…)`. Claude Code's `permissions.allow` rules are *prefix matches on the
+   literal command string*, so variable indirection defeats them and forces an
+   approval prompt every time. For renders, prefer reading the chart JSON from a
+   file over the per-call pipe (a pipe only auto-approves when *both* sides are
+   independently allowed):
+
+   ```bash
+   python scripts/chart.py natal alex --json > /tmp/alex.json
+   python scripts/render_pdf.py -i /tmp/alex.json -o alex.pdf
+   ```
+
+   See the README's "Running charts without approval prompts" for the allow-rule
+   the user adds once.
+
 ## Cohorts (groups of people)
 
 The database supports **cohorts** — named groups of people you want to collect astrological lore about. Each cohort has an id, display name, optional description, and a list of member person-ids. Cohorts are top-level in `people.json` (schema v2); a person can belong to multiple cohorts.

@@ -53,6 +53,8 @@ python plugins/group-synastry/skills/group-synastry/scripts/synastry.py alex jor
 
 All chart/synastry/composite scripts accept `--json` (structured output for programmatic use) and `--house-system {placidus,koch,whole-sign,equal,porphyry,regiomontanus,campanus}`.
 
+**To render unattended (no permission prompt):** invoke a script as a plain literal command — `.venv/bin/python plugins/group-synastry/skills/group-synastry/scripts/render_pdf.py -i chart.json -o out.pdf` — *not* wrapped in a shell variable (`PY=…; $PY …`), `&&` chain, or pipe. The `Bash(.venv/bin/python *)` allow rule is a **prefix match on the literal command**, so variable indirection defeats it and forces a prompt. Read chart JSON from a file with `-i FILE` rather than piping `chart.py --json | render_*.py`.
+
 Tests bring their own fixture (`<skill>/tests/fixtures/people_test.json`, gitignored) — they do not touch the user's real `people.json`.
 
 ## Architecture

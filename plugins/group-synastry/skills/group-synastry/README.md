@@ -123,6 +123,48 @@ python scripts/chart.py natal alex --json | python scripts/render_pdf.py -o alex
 See `SKILL.md` (sibling file) for the full behavior contract and the spec at
 `docs/specs/primary.md` (in the marketplace repo root) for the design rationale.
 
+## Running charts without approval prompts
+
+By default Claude Code asks before running the skill's Python scripts — they
+execute code and write files. To let chart generation run unattended:
+
+- **Easiest — approve once.** The first time Claude asks to run a
+  `group-synastry` script, choose **"Yes, and don't ask again."** Claude Code
+  records an allow-rule for that command shape; subsequent charts render without
+  prompting.
+
+- **Pre-authorize.** Add `permissions.allow` rules to `~/.claude/settings.json`
+  (global) or the project's `.claude/settings.json`. They are **prefix matches
+  on the literal command**, so use the exact prefix the approval prompt shows
+  you. For a typical local setup:
+
+  ```json
+  {
+    "permissions": {
+      "allow": [
+        "Bash(python scripts/chart.py *)",
+        "Bash(python scripts/synastry.py *)",
+        "Bash(python scripts/composite.py *)",
+        "Bash(python scripts/render_pdf.py *)",
+        "Bash(python scripts/render_docx.py *)",
+        "Bash(python scripts/db.py *)"
+      ]
+    }
+  }
+  ```
+
+  Adjust the interpreter and path to how the scripts run for you — a virtualenv
+  (`./.venv/bin/python …`), an absolute path, or the installed-plugin path that
+  appears in the prompt.
+
+- **Avoid** `bypassPermissions` / `--dangerously-skip-permissions`: that disables
+  prompts for *every* command, not just this skill.
+
+Because the rules match the literal command, the scripts must be invoked as
+plain single commands (e.g. `python scripts/render_pdf.py -i chart.json -o
+out.pdf`) — not via shell variables, `&&` chains, or pipes, which dodge the
+prefix and re-trigger the prompt. The skill follows this convention by default.
+
 ## Privacy
 
 `people.json` is plain JSON, not encrypted. Birth data (date / time /
