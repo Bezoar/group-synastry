@@ -4,16 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A Claude Code **plugin marketplace** containing the `group-synastry` skill, plus its spec (`docs/spec.md`) and eval suite (`evals/`). The skill computes astrological birth charts, synastry, and composite/Davison charts for a small private group. The same skill bundle runs in Claude Code (via plugin install) and on Claude.ai (uploaded as a skill).
+A Claude Code **plugin marketplace** containing the `group-synastry` skill, plus its spec (`docs/specs/primary.md`) and eval suite (`evals/`). The skill computes astrological birth charts, synastry, and composite/Davison charts for a small private group. The same skill bundle runs in Claude Code (via plugin install) and on Claude.ai (uploaded as a skill).
 
 The plugin layout — `plugins/group-synastry/skills/group-synastry/` — is referred to as **`<skill>/`** throughout this doc to keep paths readable.
 
-**Status:** Phases 1 and 2 of 6 are built. Phase 1 = Western tropical natal + synastry + composite + Davison + Markdown. Phase 2 = `.docx` (via Node + docx-js) and `.pdf` (via LibreOffice headless) rendering with shared style tokens. Phases 3–6 (Vedic, Hellenistic, BaZi, predictive, group ops, polish) are deferred per `docs/spec.md` §11. If a user asks for a deferred feature, say what's available now and offer an inline approximation if appropriate — don't pretend it works.
+**Status:** Phases 1 and 2 of 6 are built. Phase 1 = Western tropical natal + synastry + composite + Davison + Markdown. Phase 2 = `.docx` (via Node + docx-js) and `.pdf` (via LibreOffice headless) rendering with shared style tokens. Phases 3–6 (Vedic, Hellenistic, BaZi, predictive, group ops, polish) are deferred per `docs/specs/primary.md` §10. If a user asks for a deferred feature, say what's available now and offer an inline approximation if appropriate — don't pretend it works.
 
 ## Canonical documents — read these before changing behavior
 
+**CRITICAL: when editing any file in docs/specs, if there is a file in this repo called docs/instructions/editing-specs.md, ALWAYS read and follow the instructions there.**
+
 - **`docs/specs/primary.md` — the authoritative current-state spec.** Read this first; it covers what the repo does, how the code is organized, and the load-bearing design decisions with rationale. Update it when behavior changes.
-- `docs/spec.md` — the **original** Phase 1 design spec. Frozen, historical. Decisions D1–D9 are still authoritative for the v1 scope, but implementation has moved on; treat `docs/specs/primary.md` as the current source of truth.
+- `docs/archive/original-spec/spec.md` — the **original** Phase 1 design spec. Frozen, historical, and now **fully superseded** by `docs/specs/primary.md` (its decision log D1–D9, user stories, edge cases, and algorithmic references have all been folded into the primary spec). You shouldn't need to open it; treat `docs/specs/primary.md` as the single source of truth.
 - `<skill>/SKILL.md` — the behavior contract the skill follows at runtime (clarify-first, pick-and-choose, edge-case table, interpretation workflow). Changes here change skill behavior.
 - `evals/README.md` — eval design philosophy and run instructions; the coverage matrix tells you which behavior each eval pins.
 - `evals/reference-charts.json` — ground-truth planetary positions for the canonical test subjects (Alex, Jordan). Treat as versioned facts; only change when the underlying ephemeris improves.
@@ -143,7 +145,7 @@ When the user asks for "the composite" without qualifying, default to **midpoint
 
 - If you change `SKILL.md`'s frontmatter description: re-run the trigger evals (`evals/trigger-evals.json`) — see `evals/README.md` for the loop. The description is optimized against those 52 queries.
 - If you change a computation: re-run `pytest tests/ -q` and re-grade the behavioral evals against `evals/reference-charts.json`. Tolerances are documented in `evals/README.md` (±1 arcmin for major planets, ±2 for asteroid Keplerian fallback, ±5 for angles).
-- If you change `docs/spec.md`: update the affected behavioral evals to match (the README §"Updating the Eval Suite" lists the typical mappings).
+- If you change `docs/specs/primary.md`: update the affected behavioral evals to match (the README §"Updating the Eval Suite" lists the typical mappings).
 - Phase ordering matters: don't start Phase 3 (Vedic/Hellenistic/BaZi) before Phase 2 (`.docx`/`.pdf`) is wired up, because Phase 3's output volume needs polished formats to be useful.
 
 ## Things that look wrong but aren't
@@ -151,4 +153,4 @@ When the user asks for "the composite" without qualifying, default to **midpoint
 - `<skill>/ephe/seas_18.se1` is committed despite `.gitignore` having `ephe/*.se1` — it was force-added (commit `8d9bdab`) because the skill needs to ship with arcminute Chiron accuracy out of the box. Don't "fix" this by removing the file. This file is also the reason the whole repo is AGPL-3.0 (it's distributed under AGPL by upstream Swiss Ephemeris).
 - `people.json` and `settings.json` are gitignored globally. The tests use a separate fixture; don't add the user's real DB to the repo.
 - `chart.py`'s `PlanetEntry.source` field reports `"swisseph"` / `"keplerian"` / `"composite"`. The `lib/ephem.py` `BodyPosition.source` reports the more specific code (`swisseph_builtin` / `swisseph_with_seas18` / `keplerian_jpl_j2000`). The renderer flattens these — don't unify them without checking the eval grader.
-- `docs/spec.md` and dated reports under `docs/reports/` still reference the old `skill/` and `~/.claude/skills/group-synastry` paths. These are historical/frozen documents — don't update them; the marketplace layout is documented here and in the live READMEs.
+- `docs/archive/original-spec/spec.md` still references the old `skill/` and `~/.claude/skills/group-synastry` paths internally. It's a historical/frozen document — don't update it; the marketplace layout is documented here and in the live READMEs.

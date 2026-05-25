@@ -35,7 +35,14 @@ def normalize_longitude(lon: float) -> float:
     return lon % 360.0
 
 
-def split_longitude(lon: float) -> Position:
+def split_longitude_exact(lon: float) -> Position:
+    """Exact split: degree, FLOORED arc-minute, and the residual arc-second.
+
+    This is the split behind every position shown in a chart (charts display
+    arc-seconds, so the floored minute is exactly correct — the remainder lands
+    in the seconds field, with no rounding bias). :func:`split_longitude` is the
+    rounded variant, kept only for minute-only summaries.
+    """
     lon = normalize_longitude(lon)
     sign_index = int(lon // 30)
     in_sign = lon - 30 * sign_index
@@ -55,12 +62,52 @@ def split_longitude(lon: float) -> Position:
     return Position(SIGNS[sign_index], deg, mins, secs, lon)
 
 
+def split_longitude(lon: float) -> Position:
+    """Split a longitude into sign/degree/arc-minute, **rounded to the nearest
+    arc-minute**, for minute-only summaries (no arc-seconds shown).
+
+    When seconds are omitted, rounding (not flooring) avoids a systematic
+    downward bias: e.g. 24°38'41" reads as 24° Gemini 39', not 38'. The
+    ``second`` field is 0 by construction here. Chart tables show arc-seconds
+    and use :func:`split_longitude_exact` instead; this variant remains for the
+    minute-only :func:`format_position` path.
+    """
+    lon = normalize_longitude(lon)
+    sign_index = int(lon // 30)
+    in_sign = lon - 30 * sign_index
+    deg = int(in_sign)
+    minute = int(round((in_sign - deg) * 60))
+    if minute == 60:
+        minute = 0
+        deg += 1
+    if deg == 30:
+        deg = 0
+        sign_index = (sign_index + 1) % 12
+    return Position(SIGNS[sign_index], deg, minute, 0, lon)
+
+
 def format_position(lon: float, retrograde: bool = False, with_seconds: bool = False) -> str:
     """Format an ecliptic longitude as e.g. \"10° Taurus 53'\" or with seconds."""
-    p = split_longitude(lon)
+    p = split_longitude_exact(lon) if with_seconds else split_longitude(lon)
     base = f"{p.degree}° {p.sign} {p.minute:02d}'"
     if with_seconds:
         base = f"{p.degree}° {p.sign} {p.minute:02d}' {p.second:02d}\""
+    if retrograde:
+        base += " R"
+    return base
+
+
+def format_position_glyph(lon: float, retrograde: bool = False) -> str:
+    """Render a longitude as a chart-table position with the sign glyph and
+    arc-second precision, e.g. ``24° ♊ Gemini 38' 41\"``.
+
+    Uses :func:`split_longitude_exact`, so the arc-minute is floored and the
+    remainder shows as arc-seconds — exact, with no rounding bias. This is the
+    single source of truth for position strings in the Markdown renderer.
+    """
+    p = split_longitude_exact(lon)
+    glyph = GLYPHS.get(p.sign, "")
+    base = f"{p.degree}° {glyph} {p.sign} {p.minute:02d}' {p.second:02d}\""
     if retrograde:
         base += " R"
     return base

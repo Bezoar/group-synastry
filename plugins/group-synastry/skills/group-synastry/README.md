@@ -121,7 +121,7 @@ python scripts/chart.py natal alex --json | python scripts/render_pdf.py -o alex
 ```
 
 See `SKILL.md` (sibling file) for the full behavior contract and the spec at
-`docs/spec.md` (in the marketplace repo root) for the design rationale.
+`docs/specs/primary.md` (in the marketplace repo root) for the design rationale.
 
 ## Privacy
 

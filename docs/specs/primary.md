@@ -1,7 +1,7 @@
 # `group-synastry` — Primary Specification
 
 **Status:** Current as of 2026-05-12 (Phase 1 + Phase 2 + Phase 1.5 interpretation)
-**Supersedes (for current state):** `docs/spec.md` (kept as the original Phase 1 design spec — historical reference)
+**Supersedes:** `docs/archive/original-spec/spec.md` — fully. That document's still-relevant content has been folded into this one (decision log §9, user stories §4.4, edge cases §15, algorithmic references §16); the archive is kept only as a frozen historical record.
 
 This document is the authoritative description of the `group-synastry` repository **as it exists today**. It covers what the skill does, how the code is organized, why the load-bearing design decisions were made, and where the seams are for future work. New contributors and future Claude sessions should read this first.
 
@@ -18,7 +18,7 @@ This document is the authoritative description of the `group-synastry` repositor
 - **Optional LLM-authored interpretation prose** at `none / min / max` depth, appended after the data tables.
 - **Persistent default output directory** so chart artifacts can be routed automatically into a synced cloud folder (e.g., Proton Drive).
 
-The non-goals from `docs/spec.md` §3 still apply: no real-time/mundane/horary/electional/astrocartography, no GUI, no multi-user cloud storage.
+The original non-goals still apply: no real-time/mundane/horary/electional/astrocartography, no GUI, no multi-user cloud storage.
 
 ## 2. Repository topology
 
@@ -31,15 +31,13 @@ group-synastry-private/
 │       └── skills/
 │           └── group-synastry/        The skill bundle (see §3)
 ├── docs/
-│   ├── spec.md                        Original Phase 1 design spec — frozen for historical reference
-│   ├── specs/primary.md               THIS FILE — authoritative current-state spec
-│   ├── generated/                     Generated audit notes (e.g., Chiron debugging)
-│   └── reports/                       Phase implementation reports
+│   ├── archive/original-spec/spec.md  Original Phase 1 design spec — frozen for historical reference
+│   └── specs/primary.md               THIS FILE — authoritative current-state spec
 ├── evals/                             Trigger + behavioral eval suite (see evals/README.md)
 ├── CLAUDE.md                          Day-to-day operating notes for Claude Code sessions
 ├── README.md                          Repo overview + install pointer
 ├── LICENSE                            Full AGPL-3.0 license text
-└── .gitignore                         Plus a force-add for skill/ephe/seas_18.se1
+└── .gitignore                         Ignores people.json / settings.json / *.se1 (seas_18.se1 is force-added past it via `git add -f`)
 ```
 
 The marketplace pattern (`.claude-plugin/marketplace.json` listing plugins under `plugins/<name>/`) is forward-compatible with adding a second plugin later, even though there's only one today. Installation is one command in a Claude Code session: `/plugin marketplace add <repo>` + `/plugin install group-synastry`.
@@ -52,16 +50,19 @@ The skill bundle is referred to as `<skill>/` throughout this document — that 
 <skill>/
 ├── SKILL.md                The behavior contract Claude follows at runtime
 ├── README.md               Install + usage instructions
+├── requirements.txt        The one core Python dep (pyswisseph>=2.10)
 ├── package.json            Node-side deps (docx@^9, marked@^18) — project-local
 ├── package-lock.json       Pinned Node versions
 ├── ephe/
 │   ├── NOTICE              Swiss Ephemeris attribution
 │   └── seas_18.se1         Bundled asteroid file (forces AGPL on the bundle)
-├── scripts/
-│   ├── db.py               CRUD on people.json
+├── scripts/                (also __init__.py here and in lib/ — package markers)
+│   ├── db.py               CRUD on people.json + cohorts
 │   ├── chart.py            Western tropical natal chart computation
 │   ├── synastry.py         Pairwise synastry
 │   ├── composite.py        Midpoint + Davison composites
+│   ├── time_range.py       Birth-time hysteresis + time-range variants (§7.6)
+│   ├── check_env.py        Dependency doctor (§13.1)
 │   ├── render_md.py        Markdown renderer
 │   ├── render_docx.py      .docx renderer (Python wrapper for the Node side)
 │   ├── render_pdf.py       .pdf renderer (calls render_docx then soffice)
@@ -78,11 +79,14 @@ The skill bundle is referred to as `<skill>/` throughout this document — that 
 └── tests/
     ├── conftest.py         Path injection so tests can import scripts modules
     ├── fixtures/
-    │   └── people_test.json  Alex + Jordan reference fixtures
+    │   └── people_test.json     Alex + Jordan reference fixtures
     ├── test_chart.py
     ├── test_db.py
     ├── test_settings.py
     ├── test_synastry_composite.py
+    ├── test_cohorts.py
+    ├── test_time_range.py
+    ├── test_check_env.py
     ├── test_render_docx.py
     ├── test_render_pdf.py
     └── test_interpretation_persistence.py
@@ -96,7 +100,7 @@ The behavioral contract lives in `<skill>/SKILL.md`. Three principles are load-b
 
 When the user hasn't already specified, Claude **must ask** about:
 
-- Which astrological system (Western tropical default; Vedic / Hellenistic / BaZi deferred per spec §11).
+- Which astrological system (Western tropical default; Vedic / Hellenistic / BaZi deferred — §10).
 - Output format (inline Markdown default; `.docx`, `.pdf`).
 - Target date (for any predictive request).
 - House system (Placidus default).
@@ -112,6 +116,17 @@ There is no "do everything" report. If the user asks for "Alex's chart" without 
 
 Every natal chart and synastry **must** include: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, **Chiron**, **Lilith (Mean Apogee)**, **Ceres**, **Eris**, True Node, ASC, MC. Missing any is a spec failure — the behavioral evals check this explicitly.
 
+### 4.4 Representative user requests
+
+The canonical phrases the skill triggers on (kept in sync with the eval set). Items marked *(deferred)* are spec'd but not built yet (§10) — when one fires today, say what's available now and offer an inline approximation rather than pretending it works.
+
+- **People management** — "Add Alex to my group: born June 15 1988, 8:20 AM, Chicago IL (41.88°N, 87.63°W)"; "Show me everyone in the group"; "Update Alex's birth time to 1:46 PM"; "Remove the entry for X"; "Tag Alex and Jordan as family" (cohorts, §7.5).
+- **Individual charts** — "Show me Alex's full Western chart"; "Compute Alex's Vedic chart" *(deferred)*; "Make a BaZi reading for Jordan" *(deferred)*; "Give me Alex's Hellenistic Lots" *(deferred)*; "What are Jordan's declinations?" *(deferred)*.
+- **Synastry / composite** — "Synastry between Alex and Jordan"; "Composite chart for Alex and Jordan"; "Davison chart for Alex and Jordan"; "Make a Word doc / PDF of the synastry between Alex and Jordan".
+- **Predictive (individual)** *(all deferred — Phase 4)* — progressions, current Vedic dasha, Solar Return, current transits to natal.
+- **Group operations** *(deferred — Phase 5)* — "Compatibility matrix for everyone"; "Synastry between Alex and everyone else".
+- **Selectivity (always).** The user must be able to specify *which* system and *which* output format. Default to inline Markdown unless `.docx`/`.pdf` is asked for. See §4.2.
+
 ## 5. Computation architecture (the Python core)
 
 ### 5.1 Environment dispatch — `lib/env.py`
@@ -122,6 +137,8 @@ The same skill bundle runs in Claude Code (where the user's home is on disk) and
 - `settings_json_path()` — user preferences
 - `outputs_dir()` — where rendered charts land
 - `swisseph_data_paths()` — search path for `.se1` files
+
+(Plus the helpers those build on: `data_dir()`, `is_claude_ai()`, and `swisseph_path_string()`.)
 
 `outputs_dir()` consults `settings.default_output_dir` first, so users can route output to a synced cloud folder (typical Proton Drive path: `~/Library/CloudStorage/ProtonDrive-<email>/group-synastry/charts/`).
 
@@ -135,9 +152,11 @@ The wrapper declares a **best source** per body (`_BODY_SOURCES` dict) and **rai
 - `swisseph_with_seas18` — uses the bundled `<skill>/ephe/seas_18.se1`; arcsec-arcmin accurate for Chiron / Ceres / Pallas / Juno / Vesta.
 - `keplerian_jpl_j2000` — JPL J2000 osculating elements via `lib/kepler.py`; arcminute accurate for Eris (no bundled Swiss Eph file for asteroid 136199).
 
+Pallas, Juno, and Vesta have `seas_18` sources declared in `_BODY_SOURCES` but are **not** in the default natal set (`NATAL_BODIES`) — they're wired up for future use, not computed by any chart today.
+
 **Why this matters:** earlier in development, silent fallback produced different positions on different machines depending on which `.se1` files happened to be installed. Eval results were non-reproducible. Now `force_source="..."` is required to opt into a fallback — silence is no longer allowed.
 
-The Chiron M₀ correction (the original design spec §8 carried a 2012-era epoch value mislabeled as J2000) is the reason Chiron is now computed via Swiss Ephemeris (bundled `seas_18.se1`) rather than the Keplerian fallback. Reference positions are pinned in `evals/reference-charts.json` against Swiss Eph 2.10 values.
+The Chiron M₀ correction (the original design carried a 2012-era epoch value mislabeled as J2000) is the reason Chiron is now computed via Swiss Ephemeris (bundled `seas_18.se1`) rather than the Keplerian fallback. Reference positions are pinned in `evals/reference-charts.json` against Swiss Eph 2.10 values.
 
 ### 5.3 IANA-only timezones — `lib/tz.py`
 
@@ -145,11 +164,11 @@ The Chiron M₀ correction (the original design spec §8 carried a 2012-era epoc
 
 ### 5.4 The three computation scripts
 
-- **`chart.py natal <id>`** — Western tropical natal chart. Includes all D6 bodies, Placidus houses by default, aspects with default orbs (spec §6.2), retrograde markers, source labeling. `--house-system` accepts `placidus|koch|whole-sign|equal|porphyry|regiomontanus|campanus`. `--json` emits the canonical structured form for renderer consumption.
-- **`synastry.py <a> <b>`** — pairwise inter-aspects (tightest first) **plus** house overlays in *both* directions (A's planets in B's houses, and B's planets in A's). Missing either direction is incomplete per spec §16; the behavioral evals enforce this.
+- **`chart.py natal <id>`** — Western tropical natal chart. Includes all D6 bodies **plus a derived South Node** (always added opposite the True Node), Placidus houses by default, aspects between bodies **and to the Ascendant/Midheaven** with default per-aspect orbs (`lib/formatting.aspect_from_separation`), retrograde markers, per-body source labeling. `--house-system` accepts `placidus|koch|whole-sign|equal|porphyry|regiomontanus|campanus` — validated in `lib/ephem.HOUSE_SYSTEM_CODES`, **not** by an argparse `choices=`, so an unrecognized value errors at computation time rather than at parse time. `--json` emits the canonical structured form for renderer consumption.
+- **`synastry.py <a> <b>`** — pairwise inter-aspects (tightest first) **plus** house overlays in *both* directions (A's planets in B's houses, and B's planets in A's). Missing either direction is incomplete (§16, house overlay); the behavioral evals enforce this.
 - **`composite.py midpoint <a> <b>` / `composite.py davison <a> <b>`** — midpoint uses per-pair shorter-arc longitudes with equal-house from the composite Ascendant; Davison casts a real natal chart at the temporal + great-circle spatial midpoint and reuses `compute_natal`.
 
-All three accept `--interpretation FILE` (since Phase 1.5; see §7).
+All three resolve `--house-system` through `settings.default_house_system()` (falling back to Placidus when unset) and accept `--interpretation FILE` (since Phase 1.5; see §7).
 
 ## 6. Rendering architecture
 
@@ -161,7 +180,7 @@ Pure Python; the chart computation scripts call into it directly. Produces clean
 
 ### 6.2 `.docx` — `scripts/render_docx.py` + `scripts/lib/render_docx.js`
 
-The Python wrapper spawns `node lib/render_docx.js` per call, piping the payload `{kind, chart, style, theme?, interpretation?}` as JSON on stdin. The Node side uses `docx@^9` (project-local, not global) to build the document, applies the style tokens (with theme resolution), and writes the `.docx` to the path given via `--out`. **Why Node:** `docx-js` has no maintained Python port, and the validation tooling the spec calls for (§10.2) lives in the JS ecosystem.
+The Python wrapper spawns `node lib/render_docx.js` per call, piping the payload `{kind, chart, style, theme?, interpretation?}` as JSON on stdin. The Node side uses `docx@^9` (project-local, not global) to build the document, applies the style tokens (with theme resolution), and writes the `.docx` to the path the wrapper hands it. (The user-facing flag on `render_docx.py` / `render_pdf.py` is `--output` / `-o`; `--out` is the internal flag the wrapper passes to the Node process.) **Why Node:** `docx-js` has no maintained Python port, and the document-validation tooling lives in the JS ecosystem.
 
 The Node renderer:
 
@@ -177,10 +196,10 @@ Produces a `.docx` first (via `render_to_docx`) into a temp directory, then runs
 
 ### 6.4 Style tokens + themes — `scripts/lib/style.json`
 
-Centralized per spec §10.4 with two themes:
+Centralized style tokens, with two themes:
 
 - **light** — black-on-white; standard for print and editing. Default for `.docx`.
-- **dark** — `#1A1A24` page background, `#E8E6F0` body text, periwinkle headings, gold accents. Default for `.pdf` (PDFs are typically viewed on-screen).
+- **dark** — `1A1A24` page background, `E8E6F0` body text (hex is stored without a leading `#` in `style.json`), periwinkle headings, gold accents. Default for `.pdf` (PDFs are typically viewed on-screen).
 
 Both renderers accept `--theme {light,dark}` to override. The page background is the load-bearing mechanism for dark PDFs — docx-js writes `<w:background w:color="1A1A24"/>` into `word/document.xml`, and LibreOffice's PDF export preserves it. A regression test (`test_dark_theme_pdf_is_actually_dark`) uses ImageMagick to confirm the rendered PDF has mean brightness <100 on the dark theme vs >180 on light.
 
@@ -190,7 +209,7 @@ Chart computation is deterministic. Interpretation prose is not. The skill treat
 
 ### 7.1 LLM-authored, not skill-authored
 
-The Python scripts emit no prose. When the user asks for `min` or `max` interpretation, **Claude writes the prose** in the conversation, structures it as a JSON object, and feeds it to the renderers. This trades consistency (different runs produce different phrasings) for contextual quality (each section can reference specific chart features). Per spec §9.4, the alternative — a stock interpretation library in `references/*.md` — is documented as a future extension but not built.
+The Python scripts emit no prose. When the user asks for `min` or `max` interpretation, **Claude writes the prose** in the conversation, structures it as a JSON object, and feeds it to the renderers. This trades consistency (different runs produce different phrasings) for contextual quality (each section can reference specific chart features). The alternative — a stock interpretation library in `references/*.md` — is documented as a future extension (§14) but not built.
 
 ### 7.2 Payload shape
 
@@ -335,11 +354,13 @@ Open question: when both people in a pair have non-zero hysteresis, the leaf nam
 
 | Artifact | Lives at | Created by | Notes |
 |---|---|---|---|
-| People DB | `~/.config/group-synastry/people.json` (Claude Code) or `/mnt/user-data/uploads/people.json` (Claude.ai) | `db.py add/update/remove` | Plain JSON, no encryption (spec §15 leaves this as future work). Birth data is sensitive — treat the file as PII. |
+| People DB | `~/.config/group-synastry/people.json` (Claude Code) or `/mnt/user-data/uploads/people.json` (Claude.ai) | `db.py add/update/remove` | Plain JSON, no encryption (deferred; §14). Birth data is sensitive — treat the file as PII. |
 | User preferences | `<data_dir>/settings.json` | `lib/settings.py set` | Known keys: `default_house_system`, `default_ayanamsa`, `default_output_format`, `default_output_dir`, `default_output_subfolders`, `default_interpretation_level`, `default_zodiac`, `people_db_dir`, `active_cohort`. Unknown keys round-trip through saves for forward compat. `default_output_subfolders` is a dict mapping chart kind → subfolder name. `active_cohort` is a cohort id that adds a `cohorts/<id>/` prefix before the kind subfolder when rendering bare-filename outputs. `people_db_dir` overrides the location of `people.json` (defaults to `<data_dir>`); useful for putting the DB in a synced cloud folder while keeping `settings.json` local. |
 | Ephemeris file | `<skill>/ephe/seas_18.se1` (bundled) and optionally `~/.swisseph/` (user-provided) | Shipped with the skill | Force-added past `.gitignore`'s `ephe/*.se1` rule. AGPL-licensed by upstream — this is why the whole bundle is AGPL. |
 | Rendered chart | `outputs_dir() / <filename>` | `render_docx.py`, `render_pdf.py` | `outputs_dir()` honors `default_output_dir` first. Absolute `--output` paths bypass it. |
 | Interpretation sidecar | `<output_stem>.interpretation.md`, next to the rendered file | The renderers, when `--interpretation` is used and `--no-sidecar` is not | Human-editable; re-importable via `--interpretation`. |
+
+Not every key in `KNOWN_KEYS` has a script consumer yet: `default_zodiac` and `default_ayanamsa` are forward-declared for the deferred sidereal/Vedic work (nothing reads them today), and `default_output_format` / `default_interpretation_level` are behavioral hints Claude consults in the clarify-flow (per SKILL.md), not inputs to any CLI. They still round-trip through saves.
 
 ## 9. Key design decisions and the reasons for them
 
@@ -350,12 +371,28 @@ Open question: when both people in a pair have non-zero hysteresis, the leaf nam
 | **No silent ephemeris fallback** | Earlier behavior — degrade-to-Keplerian when `.se1` files aren't present — produced different positions on different machines, breaking eval reproducibility. Now callers must pass `force_source="keplerian_jpl_j2000"` to opt in. |
 | **IANA timezones only; abbreviations rejected** | "EST" maps to multiple IANA zones (Indiana vs. New York have different historical DST). Abbreviation auto-substitution silently produces wrong charts; rejection forces the user to specify. |
 | **D6 always-included bodies** | Chiron, Ceres, Lilith, Eris carry interpretive weight that the user probably wants; making them opt-in would let them be silently missed. |
-| **Python → Node bridge for `.docx`** | `docx-js` has no maintained Python port; the spec's planned validation path (§10.2) lives in the JS ecosystem. Subprocess overhead per render is ~150ms — acceptable. |
+| **Python → Node bridge for `.docx`** | `docx-js` has no maintained Python port; the planned document-validation path lives in the JS ecosystem. Subprocess overhead per render is ~150ms — acceptable. |
 | **Data before prose, always** | Honor users who want the numbers without scrolling past interpretation. Pinned by an ordering test (byte index of Aspects < byte index of Interpretation in `document.xml`). |
 | **LLM-authored interpretation, not stock library** | Stock interpretations would be more consistent run-to-run but less contextual. Long-term, a hybrid is possible (stock skeleton + LLM synthesis) — `references/*.md` markdown files are planned per spec but not yet built. |
 | **`.pdf` defaults to dark; `.docx` defaults to light** | PDFs are usually viewed on-screen; docx files are usually edited or printed. Different defaults match different consumption modes. Both accept `--theme` to override. |
 | **`default_output_dir` resolves lazily** | `env.py` imports `settings` inside `outputs_dir()` rather than at module level to avoid a circular import (settings.py imports env.py for path resolution). Lazy import is a deliberate cycle-break. |
 | **Sidecar archiving (interpretation source persists)** | Without it, the prose Claude writes is either baked into a binary document (unimportable) or ephemeral (lost when the chat is cleared). The sidecar lets users edit and re-render without re-asking Claude to re-write. |
+
+### Mapping to the original decision log (D1–D9)
+
+The original spec froze nine decisions. They remain authoritative for v1 scope; this is where each one lives now (so the archive isn't needed to look them up):
+
+| # | Original decision | Current state |
+|---|---|---|
+| D1 | Primary environment: both Claude Code and Claude.ai | Unchanged — `lib/env.py` dispatches between the two (§5.1). |
+| D2 | Full predictive toolkit, pick-and-choose at invocation | Pick-and-choose holds (§4.2); the predictive toolkit itself is deferred to Phase 4 (§10). |
+| D3 | DB as JSON at `~/.config/group-synastry/people.json` (Claude Code); upload/download on Claude.ai | Holds; path now resolved by `env.py` and overridable via `settings.people_db_dir` (§8). |
+| D4 | Default house system: Placidus (per-call configurable) | Unchanged (§4.1, §5.4). |
+| D5 | Default Vedic ayanamsa: Lahiri | Stands as the default for when Vedic ships; stored as `settings.default_ayanamsa` (§8). Vedic itself deferred. |
+| D6 | Always-included bodies | Unchanged and enforced — see §4.3. |
+| D7 | Timezone authority: IANA only | Unchanged — `lib/tz.py` (§5.3). |
+| D8 | Geocoding: manual lat/lon by default; Claude may suggest coords via web search | Unchanged. Birth records store explicit `lat`/`lon`; there is no geocoding API integration (the API choice is still an open question, §14). |
+| D9 | Privacy: plaintext JSON, no encryption in v1, documented | Unchanged — plaintext, treated as PII (§8); encryption remains deferred (§14). |
 
 ## 10. Capabilities matrix
 
@@ -380,11 +417,28 @@ Open question: when both people in a pair have non-zero hysteresis, the leaf nam
 | Vedic / Jyotish | — Phase 3 (deferred) | `references/vedic.md` (not yet built) |
 | Hellenistic (Lots, sect, ZR) | — Phase 3 / 4 (deferred) | |
 | Chinese BaZi | — Phase 3 (deferred) | |
+| Draconic | — deferred (lower priority) | |
+| Heliocentric | — deferred (lower priority) | |
 | Progressions / transits / returns / dasha | — Phase 4 (deferred) | |
 | Group operations (compatibility matrix, batch synastry) | — Phase 5 (deferred) | |
 | Fixed stars / asteroid library / locational / harmonics | — Phase 6 (deferred) | |
 | Continuous interpretation slider | — future | Renderer already shape-agnostic; SKILL.md-only change |
 | Embedded images in interpretation | — future | Extend `image` token in `lib/render_docx.js` `inlineRuns()` |
+
+### 10.1 Intended scope for the deferred systems
+
+When the deferred systems are built, the original design intended this per-operation coverage (preserved here so the intent isn't lost):
+
+| System | Individual | Synastry | Midpoint composite | Davison |
+|---|---|---|---|---|
+| Western tropical | ✓ built | ✓ built | ✓ built | ✓ built |
+| Vedic / Jyotish (sidereal, multi-ayanamsa) | ✓ | ✓ (kuta-style + inter-aspects) | ✗ (not traditional) | ✗ |
+| Hellenistic (Whole-Sign, Lots, sect) | ✓ | ✓ (alongside tropical) | rarely meaningful | ✗ |
+| Chinese BaZi (Four Pillars) | ✓ | ✓ (element compatibility, animal triads) | ✗ | ✗ |
+| Draconic | ✓ | ✓ (alongside tropical) | ✓ | ✓ |
+| Heliocentric | ✓ | rarely used | rarely used | ✗ |
+
+Intended predictive subsystems (individual only): secondary progressions, solar arc directions, Solar/Lunar Return, transits-to-natal (Western); annual profections, Zodiacal Releasing from Spirit & Fortune (Hellenistic); Vimshottari Dasha — Maha/Antar/Pratyantar (Vedic); Da Yun 10-year luck pillars (Chinese).
 
 ## 11. Extension points
 
@@ -419,7 +473,7 @@ From `evals/README.md` §"Notes on Reference Data Accuracy":
 | Asteroid Keplerian fallback (Ceres, Eris) | ±2 arcminutes |
 | House cusps and angles | ±5 arcminutes (sensitive to coordinate precision) |
 | Solar Return moment | ±5 minutes |
-| Davison location | ±0.5° (lat/lon midpoint approximation) |
+| Davison location | ±0.5° (great-circle midpoint; tolerance covers coordinate precision) |
 
 A skill that consistently misses by 30+ arcminutes is doing something fundamentally wrong (computing for the wrong date, applying ayanamsa twice, etc.).
 
@@ -437,8 +491,8 @@ Renderer tests skip cleanly on machines without their dependencies, so CI on a b
 ### 13.1 End-user install (Claude Code)
 
 ```
-/plugin marketplace add /path/to/group-synastry-private   # or a GitHub URL once public
-/plugin install group-synastry
+/plugin marketplace add Bezoar/group-synastry
+/plugin install group-synastry@group-synastry-marketplace
 ```
 
 Dependencies are then handled by a **preflight doctor** rather than manual
@@ -483,15 +537,52 @@ Full suite runs in ~3 minutes (mostly soffice-bound PDF tests); the fast suite (
 - **Encryption of `people.json`.** Spec §15 leaves this as a deferred question. Currently plaintext; the user is expected to treat the file as PII.
 - **Direct cloud API integration.** Output currently flows through synced folders (Proton Drive sync app). A native API integration (Proton Drive REST, Google Drive, Dropbox, etc.) would remove the dependency on the desktop sync client but isn't built.
 - **Eval suite vs. current state drift.** The eval JSON files have descriptive prose that references the pre-marketplace `skill/...` paths. This is descriptive (not active config) but slightly stale; cleanup is a future polish task.
+- **Group composite over N>2 people.** A midpoint over more than two people ("family chart") may or may not be meaningful. Deferred until requested.
+- **Geocoding API choice.** If automatic place→lat/lon lookup is ever wanted, the options are Nominatim (OSM, free), a paid provider (Google Places), or relying on Claude's web search at runtime. Currently the user enters lat/lon (D8); no API is wired in.
+- **Computation caching.** The same person's natal chart is recomputed across calls. No cache today — computation is fast enough — but a cache could be added if profiling ever shows it matters.
 
-## 15. Related documents
+## 15. Edge cases and error handling
 
-- **`<skill>/SKILL.md`** — the behavior contract Claude follows at runtime. Update this when changing user-facing behavior.
+How the skill behaves at the boundaries. This corrects the original spec's §14 table where the implementation has since diverged (notably missing-ephemeris handling, which is now strict rather than a silent fallback):
+
+| Case | Handling |
+|---|---|
+| Unknown birth time | Compute the chart but omit Ascendant, Midheaven, IC, Descendant, Vertex, and house cusps; sign positions for luminaries/planets remain valid. Print a prominent note. |
+| Approximate birth time | Compute as given. If `birth.time_hysteresis_minutes` is set, offer time-range variants (§7.6); the Ascendant moves ≈1°/4 min, so an hour of uncertainty is ≈15° of Ascendant. |
+| Pre-1582 (Julian calendar) dates | Accepted; Swiss Ephemeris handles the calendar correctly when given as a Julian Day. Warn the user. |
+| Polar latitudes (>66°) | Placidus/Koch can fail to produce cusps; fall back to Whole-Sign and tell the user. |
+| Person not found | List the available people and offer to add a new one — never silently guess. |
+| Invalid timezone (abbreviation) | Rejected with a pointer to the IANA name (e.g. "use `America/New_York`, not `EST`") — see §5.3. |
+| DST fall-back ambiguity | `zoneinfo` resolves the fold deterministically; a user override remains possible via explicit offset in the record. |
+| Two people with the same display name | Disambiguate via id (or cohort/tag); `db.find` matches id first, then display name. |
+| **Missing Swiss Ephemeris file** | **Raises `EphemerisFileMissing` — no silent Keplerian fallback** (§5.2). This is the deliberate reversal of the original spec, which called for a silent degrade; that produced machine-dependent positions and broke eval reproducibility. A caller must pass `force_source=...` to opt into the fallback. |
+| Composite requested with a non-member | Prompt for their birth data; do **not** auto-add to the DB — ask first. |
+| LibreOffice unavailable | Skip `.pdf`; offer `.docx` or Markdown and explain (the dependency doctor, §13.1, reports this). |
+| Node / `docx-js` unavailable | Skip `.docx`; offer Markdown and explain how to install. |
+
+## 16. Algorithmic references
+
+Where the load-bearing algorithms come from. The built ones cite the implementing module; the deferred ones record the intended approach so a future implementer doesn't have to re-derive them.
+
+| Component | Status / source | Notes |
+|---|---|---|
+| Tropical chart | ✓ `lib/ephem.py` | `swe.calc_ut` + `swe.houses_ex`. |
+| Midpoint composite | ✓ `composite.py` | Per-pair shorter-arc midpoint of the two longitudes; equal-house from the composite Ascendant. |
+| Davison composite | ✓ `composite.py` | Real chart cast at the temporal midpoint (UT) and **great-circle** spatial midpoint (the original spec used a naive lat/lon midpoint; upgraded for global cases). |
+| Keplerian fallback (Eris, etc.) | ✓ `lib/kepler.py` + `lib/orbital_elements.py` | Solve Kepler's equation E − e·sin E = M iteratively; standard orbit→ecliptic transform from J2000 osculating elements. |
+| House overlay | ✓ `synastry.py` | Walk each partner's planets through the other's cusps — **both directions** are required (§5.4). |
+| Vedic (sidereal + nakshatra + Vimshottari Dasha) | deferred | `swe.set_sid_mode(SIDM_LAHIRI)` + `FLG_SIDEREAL`; 27 nakshatras × 800′, pada = ¼ subdivision; dasha birth-lord from Moon's nakshatra, balance from position within it. |
+| BaZi (Four Pillars) | deferred | Year via Lìchūn cutoff; day pillar via JD-mod-60 from a known anchor; month/hour from year-stem and day-stem rules. |
+| Hellenistic Lots / profections / Zodiacal Releasing | deferred | Lot of Spirit = ASC + Sun − Moon (day chart); profection = (age mod 12)+1 whole-sign from ASC; ZR L1 in years, L2 in months. |
+| Solar arc / secondary progression | deferred | Solar arc = whole chart + (progressed Sun − natal Sun); secondary = recompute at natal JD + years-elapsed days. |
+
+## 17. Related documents
+
+- **`<skill>/SKILL.md`** — the behavior contract Claude follows at runtime. Update this when changing user-facing behavior. Structurally it is kept under ~400 lines and covers, in order: environment detection → DB read → request-type identification → **clarify** → run the right script → render; plus the load-bearing principles (clarify-before-computing §4.1, pick-and-choose §4.2, when-to-ask-vs-proceed, dependencies, and when to consult `references/*.md`). Detailed interpretation guidance lives in `references/` files (planned) that load only when relevant, not in SKILL.md itself.
 - **`CLAUDE.md`** (repo root) — day-to-day operating notes for Claude Code sessions in this repo. Points at this spec.
-- **`docs/spec.md`** — original Phase 1 design spec (frozen, historical). Decisions D1–D9 listed there are still authoritative for the v1 scope, but the implementation has moved on; this primary spec is the current truth.
+- **`docs/archive/original-spec/spec.md`** — the original Phase 1 design spec. **Fully superseded by this document** — its still-relevant content (decision log D1–D9, user stories, edge cases, algorithmic references, intended system scope) has been folded in above, so you should not need to open it. Kept only as a frozen historical record of the initial design; its internal paths and the silent-fallback edge case are stale.
 - **`evals/README.md`** — eval suite design philosophy and run instructions. The coverage matrix tells you which behavior each eval pins.
 - **`evals/reference-charts.json`** — ground-truth positions for Alex and Jordan. Only change when the underlying ephemeris improves.
-- **`docs/reports/`** — historical phase implementation reports.
 
 ---
 

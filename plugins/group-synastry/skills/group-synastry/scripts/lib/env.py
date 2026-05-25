@@ -1,8 +1,8 @@
 """Environment detection: Claude Code vs Claude.ai sandbox.
 
-Returns paths for the people.json database and chart output files. Per spec
-§5.2/§5.3, Claude.ai uses /mnt/user-data/{uploads,outputs} and Claude Code uses
-~/.config/group-synastry/ + cwd.
+Returns paths for the people.json database and chart output files. Per the
+primary spec §5.1, Claude.ai uses /mnt/user-data/{uploads,outputs} and Claude
+Code uses ~/.config/group-synastry/ + cwd.
 """
 from __future__ import annotations
 

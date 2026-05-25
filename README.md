@@ -97,7 +97,7 @@ group-synastry/
 │           └── group-synastry/  The skill bundle (SKILL.md + scripts/ + tests/ + ephe/)
 ├── docs/
 │   ├── specs/primary.md      Authoritative current-state spec (read this first)
-│   └── spec.md               Original Phase 1 design spec (historical)
+│   └── archive/original-spec/spec.md  Original Phase 1 design spec (historical)
 ├── evals/
 │   ├── README.md             Eval suite overview and how-to-run
 │   ├── trigger-evals.json    Description-optimization eval set
@@ -109,7 +109,7 @@ group-synastry/
 ## Quick Links
 
 - **Primary (current) spec:** [`docs/specs/primary.md`](docs/specs/primary.md) — authoritative description of the repo as it stands today.
-- **Original Phase 1 design spec:** [`docs/spec.md`](docs/spec.md) — frozen, historical context.
+- **Original Phase 1 design spec:** [`docs/archive/original-spec/spec.md`](docs/archive/original-spec/spec.md) — frozen, historical context.
 - **Eval suite README:** [`evals/README.md`](evals/README.md)
 - **Coverage matrix:** see eval README §"Coverage Matrix"
 
