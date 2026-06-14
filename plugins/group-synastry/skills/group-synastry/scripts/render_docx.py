@@ -12,6 +12,7 @@ Typical pipeline:
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import shutil
 import subprocess
@@ -22,8 +23,10 @@ from typing import Optional
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from lib import env, settings as _settings  # type: ignore[import-not-found]
+    from lib import wheel as wheel_mod, rasterize  # type: ignore[import-not-found]
 else:
     from .lib import env, settings as _settings
+    from .lib import wheel as wheel_mod, rasterize
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -131,6 +134,23 @@ def _parse_interpretation_markdown(text: str) -> dict:
     return {"sections": sections}
 
 
+def load_interpretation_arg(arg_value: Optional[str]):
+    """Parse a ``--interpretation`` path argument into an interpretation dict.
+
+    Returns ``(interpretation_or_None, error_message_or_None)``: on success the
+    error is ``None``; on failure the interpretation is ``None`` and the error is
+    a ready-to-print message (the CLIs print it to stderr and return code 2). A
+    falsy *arg_value* yields ``(None, None)``. Centralizes the parse + error
+    handling that chart/synastry/composite otherwise copy verbatim.
+    """
+    if not arg_value:
+        return None, None
+    try:
+        return parse_interpretation_file(Path(arg_value)), None
+    except (OSError, json.JSONDecodeError, RenderError) as exc:
+        return None, f"Error reading --interpretation {arg_value}: {exc}"
+
+
 def write_interpretation_sidecar(interp: dict, output_path: Path, *, title: str = "") -> Path:
     """Write ``<output_path>.interpretation.md`` next to *output_path*.
 
@@ -182,6 +202,18 @@ def load_style(path: Optional[Path] = None) -> dict:
     return json.loads(p.read_text())
 
 
+def build_wheel_png_b64(chart: dict, theme: Optional[str]) -> Optional[str]:
+    """Render the natal chart wheel and return it base64-encoded PNG, or ``None``
+    if no SVG rasterizer is available. The wheel is embedded at the top of natal
+    reports; a missing rasterizer degrades gracefully (text-only report) rather
+    than failing the whole document — see :func:`render_to_docx`."""
+    # annotate=False: the report supplies the title and names every body in its
+    # tables, so the embedded wheel stays clean (no in-image title or legend).
+    svg = wheel_mod.render_wheel(chart, theme=theme or "light", annotate=False)
+    png = rasterize.svg_to_png(svg, scale=2)
+    return base64.b64encode(png).decode("ascii")
+
+
 def render_to_docx(
     chart: dict,
     output_path: Path,
@@ -190,6 +222,7 @@ def render_to_docx(
     style: Optional[dict] = None,
     theme: Optional[str] = None,
     interpretation: Optional[dict] = None,
+    embed_wheel: bool = True,
     node_bin: Optional[str] = None,
 ) -> Path:
     """Render *chart* to *output_path* (.docx). Returns the output path.
@@ -223,6 +256,13 @@ def render_to_docx(
         payload["theme"] = theme
     if interp is not None:
         payload["interpretation"] = interp
+    # Embed the chart wheel at the top of natal reports. A missing rasterizer
+    # (no Chrome/LibreOffice) degrades to a text-only report rather than failing.
+    if embed_wheel and k == "natal":
+        try:
+            payload["wheel_png"] = build_wheel_png_b64(chart, theme)
+        except rasterize.RasterizeError as exc:
+            print(f"warning: chart wheel omitted — {exc}", file=sys.stderr)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         [node, str(NODE_RENDERER), "--out", str(output_path)],
@@ -264,6 +304,12 @@ def _main(argv: Optional[list[str]] = None) -> int:
         action="store_true",
         help="Suppress the <output>.interpretation.md sidecar that is otherwise "
              "written when --interpretation is used.",
+    )
+    parser.add_argument(
+        "--no-wheel",
+        action="store_true",
+        help="Do not embed the graphical chart wheel at the top of natal reports "
+             "(tables-only output).",
     )
     parser.add_argument(
         "--cohort",
@@ -323,7 +369,7 @@ def _main(argv: Optional[list[str]] = None) -> int:
         out = render_to_docx(
             chart, output_path,
             kind=effective_kind, style=style, theme=args.theme,
-            interpretation=interpretation,
+            interpretation=interpretation, embed_wheel=not args.no_wheel,
         )
     except RenderError as exc:
         print(f"Error: {exc}", file=sys.stderr)

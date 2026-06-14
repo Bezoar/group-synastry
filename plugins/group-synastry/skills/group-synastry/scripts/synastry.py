@@ -63,20 +63,11 @@ class SynastryReport:
     notes: list[str] = field(default_factory=list)
 
 
-def _index_chart(chart: chart_mod.NatalChart) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for p in chart.planets:
-        out[p.name] = p.longitude
-    for a in chart.angles:
-        out[a.name] = a.longitude
-    return out
-
-
 def compute_synastry(person_a: dict, person_b: dict, house_system: str = "placidus") -> SynastryReport:
     chart_a = chart_mod.compute_natal(person_a, house_system=house_system)
     chart_b = chart_mod.compute_natal(person_b, house_system=house_system)
-    a_idx = _index_chart(chart_a)
-    b_idx = _index_chart(chart_b)
+    a_idx = chart_a.index_by_name(include_angles=True)
+    b_idx = chart_b.index_by_name(include_angles=True)
 
     aspects: list[CrossAspect] = []
     for nm_a in SYNASTRY_BODIES:
@@ -85,9 +76,7 @@ def compute_synastry(person_a: dict, person_b: dict, house_system: str = "placid
         for nm_b in SYNASTRY_BODIES:
             if nm_b not in b_idx:
                 continue
-            sep = abs(a_idx[nm_a] - b_idx[nm_b]) % 360.0
-            if sep > 180.0:
-                sep = 360.0 - sep
+            sep = formatting.shorter_arc_separation(a_idx[nm_a], b_idx[nm_b])
             classified = formatting.aspect_from_separation(sep)
             if classified is None:
                 continue
@@ -177,13 +166,10 @@ def _main(argv: Optional[list[str]] = None) -> int:
     else:
         from .render_md import render_synastry, render_interpretation
         from . import render_docx as _rdocx
-    interpretation = None
-    if args.interpretation:
-        try:
-            interpretation = _rdocx.parse_interpretation_file(Path(args.interpretation))
-        except (OSError, json.JSONDecodeError, _rdocx.RenderError) as exc:
-            print(f"Error reading --interpretation {args.interpretation}: {exc}", file=sys.stderr)
-            return 2
+    interpretation, err = _rdocx.load_interpretation_arg(args.interpretation)
+    if err:
+        print(err, file=sys.stderr)
+        return 2
     print(render_synastry(report) + render_interpretation(interpretation))
     return 0
 

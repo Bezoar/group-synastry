@@ -34,7 +34,7 @@ def test_render_natal_pdf_defaults_to_dark(tmp_path: Path) -> None:
     """render_to_pdf without --theme should produce a dark-mode PDF (DEFAULT_PDF_THEME)."""
     chart = chart_mod.compute_natal(PEOPLE["alex"], house_system="placidus")
     out = tmp_path / "alex.pdf"
-    render_pdf.render_to_pdf(chart.to_dict(), out)
+    render_pdf.render_to_pdf(chart.to_dict(), out, embed_wheel=False)
     assert out.exists() and out.stat().st_size > 2000, f"pdf not produced or too small: {out}"
     assert out.read_bytes()[:5] == b"%PDF-", "output is not a PDF"
     assert render_pdf.DEFAULT_PDF_THEME == "dark", \
@@ -54,8 +54,8 @@ def test_dark_theme_pdf_is_actually_dark(tmp_path: Path) -> None:
     chart = chart_mod.compute_natal(PEOPLE["alex"], house_system="placidus")
     dark = tmp_path / "alex-dark.pdf"
     light = tmp_path / "alex-light.pdf"
-    render_pdf.render_to_pdf(chart.to_dict(), dark, theme="dark")
-    render_pdf.render_to_pdf(chart.to_dict(), light, theme="light")
+    render_pdf.render_to_pdf(chart.to_dict(), dark, theme="dark", embed_wheel=False)
+    render_pdf.render_to_pdf(chart.to_dict(), light, theme="light", embed_wheel=False)
     magick = shutil.which("magick") or shutil.which("convert")
     fmt = "%[fx:int(mean*255)]"
     dark_mean = int(subprocess.check_output(

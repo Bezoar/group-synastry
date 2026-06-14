@@ -42,15 +42,6 @@ REQUIREMENTS = SKILL_DIR / "requirements.txt"
 NODE_MODULES = SKILL_DIR / "node_modules"
 MIN_PYTHON = (3, 10)
 
-# soffice locations to probe when it isn't on PATH (mirrors render_pdf.py).
-_SOFFICE_FALLBACKS = (
-    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-    "/usr/bin/libreoffice",
-    "/usr/bin/soffice",
-    "/usr/local/bin/soffice",
-    "/opt/homebrew/bin/soffice",
-)
-
 
 def _pip_install_cmd() -> str:
     # Target the SAME interpreter running this script (env-adaptive: works in
@@ -75,13 +66,7 @@ def _soffice_install_hint() -> str:
 
 
 def _locate_soffice() -> str | None:
-    found = shutil.which("soffice") or shutil.which("libreoffice")
-    if found:
-        return found
-    for cand in _SOFFICE_FALLBACKS:
-        if Path(cand).exists():
-            return cand
-    return None
+    return env.find_soffice()
 
 
 def gather() -> list[dict]:

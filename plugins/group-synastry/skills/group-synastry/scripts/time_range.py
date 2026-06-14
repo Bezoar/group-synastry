@@ -40,11 +40,11 @@ from typing import Optional
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from lib import ephem  # type: ignore[import-not-found]
+    from lib import ephem, formatting  # type: ignore[import-not-found]
     from lib.tz import to_julian_day_ut  # type: ignore[import-not-found]
     import db  # type: ignore[import-not-found]
 else:
-    from .lib import ephem
+    from .lib import ephem, formatting
     from .lib.tz import to_julian_day_ut
     from . import db
 
@@ -263,14 +263,10 @@ def scan_window(person: dict, hysteresis_min: Optional[int] = None) -> dict:
 
 def _asc_summary(lon: float) -> dict:
     sign_idx = int(lon // SIGN_WIDTH)
-    signs = [
-        "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-        "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
-    ]
     deg_in_sign = lon - sign_idx * SIGN_WIDTH
     return {
         "longitude": round(lon, 4),
-        "sign": signs[sign_idx],
+        "sign": formatting.sign_of(lon),
         "degree_in_sign": round(deg_in_sign, 2),
     }
 

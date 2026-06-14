@@ -16,6 +16,7 @@ const {
   ShadingType,
   PageOrientation,
   ExternalHyperlink,
+  ImageRun,
 } = require('docx');
 const { Lexer } = require('marked');
 
@@ -465,7 +466,29 @@ function renderInterpretation(interp, style) {
       out.push(...markdownToDocx(section.body, style));
     }
   }
+  out.push(interpretationDisclaimer(style));
   return out;
+}
+
+// Small centred italic disclaimer closing every prose-interpretation section.
+const INTERPRETATION_DISCLAIMER =
+  'Automated interpretation is not a substitute for human intuition. ' +
+  'For entertainment purposes only.';
+
+function interpretationDisclaimer(style) {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 240, after: 60 },
+    children: [
+      new TextRun({
+        text: INTERPRETATION_DISCLAIMER,
+        font: styleFonts(style).body,
+        size: ptHalfPoints(styleSizes(style).footer || 9),
+        italics: true,
+        color: styleColors(style).accent || styleColors(style).text || '000000',
+      }),
+    ],
+  });
 }
 
 
@@ -473,7 +496,7 @@ function renderInterpretation(interp, style) {
 // Per-kind renderers
 // ---------------------------------------------------------------------------
 
-function renderNatal(chart, style) {
+function renderNatal(chart, style, wheelPng) {
   const children = [];
   const b = chart.birth || {};
   const place = b.place_label || `${b.lat?.toFixed(4)}, ${b.lon?.toFixed(4)}`;
@@ -481,6 +504,9 @@ function renderNatal(chart, style) {
   children.push(kvPara('Born', `${b.date} ${b.time} (${b.tz}) — ${place}`, style));
   children.push(kvPara('UT', `${chart.ut_iso}  ·  JD (UT) ${Number(chart.julian_day_ut).toFixed(4)}`, style));
   children.push(kvPara('Zodiac', `tropical  ·  House system: ${chart.house_system}`, style));
+
+  // Chart wheel sits below the heading/birth-info block and above the tables.
+  if (wheelPng) children.push(wheelImageParagraph(wheelPng, style));
 
   if (chart.angles && chart.angles.length) {
     children.push(heading('Angles', 1, style));
@@ -649,6 +675,34 @@ function footerFor(label, style) {
   });
 }
 
+// Printable text-column width in px (96 dpi) = page width − L/R margins.
+// The embedded wheel is sized to this so it spans the same width as the tables.
+function contentWidthPx(style) {
+  const pageTwips = (style.page_size === 'a4') ? 11906 : 12240; // letter default
+  const m = style.margins_twips || {};
+  const left = m.left != null ? m.left : 1080;
+  const right = m.right != null ? m.right : 1080;
+  return Math.floor((pageTwips - left - right) / 1440 * 96);
+}
+
+// A centred PNG chart wheel, embedded in natal reports (issue #39). `b64` is the
+// base64-encoded square PNG produced by render_docx.py; it is scaled to fill the
+// text column width (same margins as the tables) for maximum readability.
+function wheelImageParagraph(b64, style) {
+  const side = contentWidthPx(style);
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 160 },
+    children: [
+      new ImageRun({
+        type: 'png',
+        data: Buffer.from(b64, 'base64'),
+        transformation: { width: side, height: side },
+      }),
+    ],
+  });
+}
+
 function buildDocument(payload) {
   const { kind, chart } = payload;
   const style = resolveStyle(payload);
@@ -656,7 +710,8 @@ function buildDocument(payload) {
   let children;
   let footerLabel;
   if (k === 'natal') {
-    children = renderNatal(chart, style);
+    // Wheel is inserted inside renderNatal — below the heading, above the tables.
+    children = renderNatal(chart, style, payload.wheel_png);
     footerLabel = `${chart.display_name} — Natal`;
   } else if (k === 'synastry') {
     children = renderSynastry(chart, style);

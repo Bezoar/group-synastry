@@ -106,6 +106,14 @@ class NatalChart:
         d = asdict(self)
         return d
 
+    def index_by_name(self, include_angles: bool = False) -> dict:
+        """Map each body's name → its ecliptic longitude (planets; angles too
+        when *include_angles* is set)."""
+        idx = {p.name: p.longitude for p in self.planets}
+        if include_angles:
+            idx.update({a.name: a.longitude for a in self.angles})
+        return idx
+
 
 def compute_natal(person: dict, house_system: str = "placidus") -> NatalChart:
     birth = person["birth"]
@@ -186,9 +194,7 @@ def _compute_aspects(bodies: list[PlanetEntry]) -> list[AspectEntry]:
             # The North/South Node opposition is tautological; skip it.
             if {a.name, b.name} == _NODE_PAIR:
                 continue
-            sep = abs(a.longitude - b.longitude) % 360.0
-            if sep > 180.0:
-                sep = 360.0 - sep
+            sep = formatting.shorter_arc_separation(a.longitude, b.longitude)
             classified = formatting.aspect_from_separation(sep)
             if classified is None:
                 continue
@@ -242,13 +248,10 @@ def _main(argv: Optional[list[str]] = None) -> int:
     else:
         from .render_md import render_natal, render_interpretation
         from . import render_docx as _rdocx
-    interpretation = None
-    if args.interpretation:
-        try:
-            interpretation = _rdocx.parse_interpretation_file(Path(args.interpretation))
-        except (OSError, json.JSONDecodeError, _rdocx.RenderError) as exc:
-            print(f"Error reading --interpretation {args.interpretation}: {exc}", file=sys.stderr)
-            return 2
+    interpretation, err = _rdocx.load_interpretation_arg(args.interpretation)
+    if err:
+        print(err, file=sys.stderr)
+        return 2
     print(render_natal(chart) + render_interpretation(interpretation))
     return 0
 

@@ -192,6 +192,7 @@ HOUSE_SYSTEM_CODES = {
     "porphyry": b"O",
     "regiomontanus": b"R",
     "campanus": b"C",
+    "alcabitius": b"B",  # the medieval / traditional default (see lib/medieval)
 }
 
 
