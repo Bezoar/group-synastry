@@ -7,7 +7,9 @@ Code uses ~/.config/group-synastry/ + cwd.
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
+from typing import Optional
 
 
 CLAUDE_AI_UPLOADS = Path("/mnt/user-data/uploads")
@@ -114,3 +116,26 @@ def swisseph_data_paths() -> list[Path]:
 def swisseph_path_string() -> str:
     """Colon-separated path string suitable for ``swe.set_ephe_path``."""
     return ":".join(str(p) for p in swisseph_data_paths())
+
+
+# Likely LibreOffice ``soffice`` locations when it isn't on PATH, checked in
+# order. Consumed by render_pdf (raises if absent) and check_env (reports).
+SOFFICE_FALLBACKS = (
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",   # macOS app bundle
+    "/usr/bin/libreoffice",                                    # Debian/Ubuntu
+    "/usr/bin/soffice",
+    "/usr/local/bin/soffice",
+    "/opt/homebrew/bin/soffice",
+)
+
+
+def find_soffice() -> Optional[str]:
+    """Locate the LibreOffice ``soffice`` binary — PATH first, then the common
+    fallback install locations. Returns ``None`` if not found."""
+    found = shutil.which("soffice") or shutil.which("libreoffice")
+    if found:
+        return found
+    for cand in SOFFICE_FALLBACKS:
+        if Path(cand).exists():
+            return cand
+    return None

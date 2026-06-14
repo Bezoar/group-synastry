@@ -21,18 +21,10 @@ from typing import Optional
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import render_docx  # type: ignore[import-not-found]
+    from lib import env  # type: ignore[import-not-found]
 else:
     from . import render_docx
-
-
-# Likely soffice locations when it isn't on PATH. Checked in order.
-_SOFFICE_FALLBACKS = (
-    "/Applications/LibreOffice.app/Contents/MacOS/soffice",   # macOS Application bundle
-    "/usr/bin/libreoffice",                                    # Debian/Ubuntu default
-    "/usr/bin/soffice",
-    "/usr/local/bin/soffice",
-    "/opt/homebrew/bin/soffice",
-)
+    from .lib import env
 
 
 class PdfError(RuntimeError):
@@ -40,15 +32,12 @@ class PdfError(RuntimeError):
 
 
 def locate_soffice() -> str:
-    on_path = shutil.which("soffice") or shutil.which("libreoffice")
-    if on_path:
-        return on_path
-    for cand in _SOFFICE_FALLBACKS:
-        if Path(cand).exists():
-            return cand
+    found = env.find_soffice()
+    if found:
+        return found
     raise PdfError(
         "Could not locate LibreOffice (soffice). Install LibreOffice or expose "
-        "`soffice` on PATH. Checked PATH and: " + ", ".join(_SOFFICE_FALLBACKS)
+        "`soffice` on PATH. Checked PATH and: " + ", ".join(env.SOFFICE_FALLBACKS)
     )
 
 
@@ -63,6 +52,7 @@ def render_to_pdf(
     style: Optional[dict] = None,
     theme: Optional[str] = None,
     interpretation: Optional[dict] = None,
+    embed_wheel: bool = True,
     soffice_bin: Optional[str] = None,
 ) -> Path:
     """Render *chart* to *output_path* (.pdf). Returns the output path.
@@ -84,7 +74,7 @@ def render_to_pdf(
         render_docx.render_to_docx(
             chart, docx_path,
             kind=kind, style=style, theme=effective_theme,
-            interpretation=interpretation,
+            interpretation=interpretation, embed_wheel=embed_wheel,
         )
         # LibreOffice writes <stem>.pdf into --outdir.
         result = subprocess.run(
@@ -127,6 +117,11 @@ def _main(argv: Optional[list[str]] = None) -> int:
         action="store_true",
         help="Suppress the <output>.interpretation.md sidecar that is otherwise "
              "written when --interpretation is used.",
+    )
+    parser.add_argument(
+        "--no-wheel",
+        action="store_true",
+        help="Do not embed the graphical chart wheel at the top of natal reports.",
     )
     parser.add_argument(
         "--cohort",
@@ -184,7 +179,7 @@ def _main(argv: Optional[list[str]] = None) -> int:
         out = render_to_pdf(
             chart, output_path,
             kind=effective_kind, style=style, theme=args.theme,
-            interpretation=interpretation,
+            interpretation=interpretation, embed_wheel=not args.no_wheel,
         )
     except (PdfError, render_docx.RenderError) as exc:
         print(f"Error: {exc}", file=sys.stderr)

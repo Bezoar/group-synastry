@@ -26,7 +26,7 @@ The plugin layout — `plugins/group-synastry/skills/group-synastry/` — is ref
 ## Common commands
 
 ```bash
-# Run the test suite (37 tests should pass; Node tests skip if Node missing)
+# Run the test suite (all tests should pass; Node tests skip if Node missing)
 cd plugins/group-synastry/skills/group-synastry && python -m pytest tests/ -q
 
 # Run a single test
@@ -46,14 +46,28 @@ python plugins/group-synastry/skills/group-synastry/scripts/synastry.py alex jor
 python plugins/group-synastry/skills/group-synastry/scripts/composite.py midpoint alex jordan
 python plugins/group-synastry/skills/group-synastry/scripts/composite.py davison alex jordan
 
+# Phase 3 (medieval/traditional): sect, dignities, 7 Hermetic lots, almuten; annual profections
+python plugins/group-synastry/skills/group-synastry/scripts/medieval.py natal alex
+python plugins/group-synastry/skills/group-synastry/scripts/medieval.py natal alex --json
+python plugins/group-synastry/skills/group-synastry/scripts/medieval.py profection alex --age 37
+python plugins/group-synastry/skills/group-synastry/scripts/medieval.py profection alex --on 2026-05-25
+
 # Phase 2: produce .docx / .pdf (pipe --json through the renderer)
 python plugins/group-synastry/skills/group-synastry/scripts/chart.py natal alex --json | \
   python plugins/group-synastry/skills/group-synastry/scripts/render_docx.py -o alex.docx
 python plugins/group-synastry/skills/group-synastry/scripts/synastry.py alex jordan --json | \
   python plugins/group-synastry/skills/group-synastry/scripts/render_pdf.py -o synastry.pdf
+
+# Graphical natal chart wheel (issue #39): .svg / .png / .pdf by output extension
+python plugins/group-synastry/skills/group-synastry/scripts/chart.py natal alex --json | \
+  python plugins/group-synastry/skills/group-synastry/scripts/render_svg.py -o alex-wheel.svg
+python plugins/group-synastry/skills/group-synastry/scripts/render_svg.py -i alex.json -o alex-wheel.png --theme dark --aspects all
+# The .docx/.pdf renderers embed the wheel at the top of natal reports by default; --no-wheel for tables-only.
+# Regenerate the glyph-path data after a font change:
+python plugins/group-synastry/skills/group-synastry/scripts/lib/_gen_astro_glyphs.py
 ```
 
-All chart/synastry/composite scripts accept `--json` (structured output for programmatic use) and `--house-system {placidus,koch,whole-sign,equal,porphyry,regiomontanus,campanus}`.
+All chart/synastry/composite/medieval scripts accept `--json` (structured output for programmatic use) and `--house-system {placidus,koch,whole-sign,equal,porphyry,regiomontanus,campanus,alcabitius}`. (`medieval.py` defaults to `alcabitius`; the others default to Placidus / `settings.default_house_system`.)
 
 **To render unattended (no permission prompt):** invoke a script as a plain literal command — `.venv/bin/python plugins/group-synastry/skills/group-synastry/scripts/render_pdf.py -i chart.json -o out.pdf` — *not* wrapped in a shell variable (`PY=…; $PY …`), `&&` chain, or pipe. The `Bash(.venv/bin/python *)` allow rule is a **prefix match on the literal command**, so variable indirection defeats it and forces a prompt. Read chart JSON from a file with `-i FILE` rather than piping `chart.py --json | render_*.py`.
 
@@ -95,7 +109,19 @@ These three principles in `SKILL.md` are load-bearing:
 
 ### Phase 2 rendering: Python ↔ Node bridge for `.docx`, LibreOffice for `.pdf`
 
-`<skill>/scripts/render_docx.py` is a thin Python wrapper that spawns `node <skill>/scripts/lib/render_docx.js`, piping the chart payload (`{kind, chart, style, interpretation?}`) on stdin. The Node side uses `docx@9.x` and `marked@18.x` (project-local via `<skill>/package.json` — not global) because docx-js has no maintained Python port and the spec's validation path lives in the JS ecosystem (§10.2). Style tokens live in `<skill>/scripts/lib/style.json` and match spec §10.4 (fonts, hex colors without `#`, point sizes that the Node side doubles to half-points for docx-js).
+`<skill>/scripts/render_docx.py` is a thin Python wrapper that spawns `node <skill>/scripts/lib/render_docx.js`, piping the chart payload (`{kind, chart, style, interpretation?, wheel_png?}`) on stdin. The Node side uses `docx@9.x` and `marked@18.x` (project-local via `<skill>/package.json` — not global) because docx-js has no maintained Python port and the spec's validation path lives in the JS ecosystem (§10.2). Style tokens live in `<skill>/scripts/lib/style.json` and match spec §10.4 (fonts, hex colors without `#`, point sizes that the Node side doubles to half-points for docx-js).
+
+### Graphical chart wheel: pure-Python SVG, glyphs-as-paths (issue #39, spec §6.5)
+
+`<skill>/scripts/lib/wheel.py` builds a natal chart wheel as **SVG** in pure Python (no Node). `render_wheel(chart, *, theme, aspects, show_tints)` maps ecliptic longitude to `φ = 180 − (λ − asc_lon)` so the Ascendant sits at the left and longitude runs counter-clockwise. **All geometry is in the `WheelGeometry` dataclass and all colours in `WheelColors`** — pixel-push there, not in the drawing code. Time-unknown charts render a partial wheel (ring + planets, no houses/angles).
+
+Astrological symbols are drawn as SVG `<path>` outlines, **not** as font text: `lib/astro_glyphs.json` (generated by `lib/_gen_astro_glyphs.py` from the bundled **Astronomicon** font) holds each glyph's path/advance/bbox. This is deliberate — it makes the wheel render identically across Chrome, LibreOffice, and browsers with **zero runtime font dependency**, which is what lets the embedded PNG look the same in the Claude.ai sandbox as locally. The font ships verbatim under `<skill>/assets/fonts/astronomicon/` with its OFL licence (unmodified → no Reserved-Font-Name rename needed). **`_gen_astro_glyphs.py` carries the verified ASCII→symbol map** (vendor doc + visual specimen, per the "verify, never recall" rule); rerun it only when the font changes. `fonttools` is a dev/build dependency for that generator, not a runtime one.
+
+`<skill>/scripts/lib/rasterize.py` turns SVG into PNG/PDF: headless **Chrome** first (it polls for the output file then terminates the process, because modern `--headless=new` writes the file without exiting), then **LibreOffice** as fallback. `<skill>/scripts/render_svg.py` is the CLI (output format follows the `.svg`/`.png`/`.pdf` extension; `--aspects major|all`, `--theme`, `--scale`, `--no-tints`). Natal-only; synastry/composite wheels are a follow-up.
+
+**Themes:** `--theme light|dark`. Wheel palettes are `WheelColors` instances selected by `lib/wheel.py::colors_for(theme)`. `dark` is wheel-forward: dark field, light opaque pastel ring, black sign glyphs, bright cusps/angles/indicator lines, hard-aspect red brightened to match soft-aspect blue. `WheelColors` carries `sign_ink` (sign-glyph colour, falls back to `ink`) and `tint_opacity` (zodiac-band fill) so a theme can vary the ring independently of the field. Document page/table colours come from `style.json` themes. Adding a wheel theme = a `WheelColors` in `colors_for` + (if used in reports) a matching `style.json` theme + the name in the three `--theme` `choices` lists.
+
+**Embedding:** `render_docx.py::build_wheel_png_b64` renders the wheel PNG and the renderer passes it in the payload; `lib/render_docx.js::renderNatal` inserts an `ImageRun` **below the heading/birth-info block and above the data tables** of natal reports. Natal-only, and it **degrades safely** — a missing rasterizer logs a warning and produces a text-only report rather than failing. `--no-wheel` opts out. `test_natal_docx_embeds_wheel_below_heading_above_tables` pins the heading→wheel→positions ordering; `test_wheel.py` covers the geometry/glyph/collision/partial-wheel behavior.
 
 ### Interpretation prose is LLM-authored, not skill-authored
 
@@ -144,6 +170,14 @@ Different algorithms, both shipped:
 - **Davison** — casts a real natal chart at the temporal midpoint (UT) and great-circle spatial midpoint of the two birth events; reuses `compute_natal` on a synthetic person.
 
 When the user asks for "the composite" without qualifying, default to **midpoint** and offer Davison.
+
+### Medieval / traditional layer (Phase 3, increment 1)
+
+`<skill>/scripts/lib/medieval.py` layers the deterministic traditional-astrology substrate on top of `compute_natal`: **sect** (diurnal/nocturnal, sect light, benefic/malefic of the sect, orientality), **essential dignities** (domicile, exaltation, triplicity-by-sect, Egyptian term, Chaldean face; detriment/fall; peregrine; the +5/+4/+3/+2/+1 score; and the **almuten** of a degree — the almuten of the Ascendant is surfaced), the seven **Hermetic Lots** (Fortune, Spirit, Eros, Necessity, Courage, Victory, Nemesis — all via one uniform day/night-reversing rule, `lot_value`), and **annual profections** (profected sign/house, lord of the year, monthly sign, and the lord of the year's natal condition), plus **antiscia / contra-antiscia** (with within-orb contacts), and **mutual reception** (by domicile/exaltation). `compute_medieval(person, house_system="alcabitius")` assembles a `MedievalChart`; the CLI is `medieval.py natal|profection <id>` (profection is predictive → a separate explicit subcommand, never part of natal output); `render_md.render_medieval()` / `render_profection()` render Markdown. Alcabitius (Swiss Eph `B`) was added to `ephem.HOUSE_SYSTEM_CODES` and is the medieval default.
+
+Two load-bearing constraints from `docs/specs/medieval.md`:
+- **Reference tables are verified, never recalled** (spec §4). The dignity tables carry source citations in comments, were cross-checked across ≥2 authoritative sources, and use the **Egyptian** terms (the medieval default — *not* the Ptolemaic set). `test_medieval.py` has integrity guards (every Egyptian-term row sums to 30°; each planet rules the right count of domiciles) so a future transcription error fails loudly.
+- **Computation only — no prose, no citations yet.** The medieval CLI emits numbers and dignity states, like the other chart scripts. The citation-bearing interpretation layer (spec §5) depends on a verified corpus built as a separate sub-project (`docs/research/biblio.md`, issue #34) and is deliberately **not** wired here — so there is no code path that could emit an un-grounded citation. Also deferred: the medieval `.docx`/`.pdf` branch (a new case in both `detect_kind`s), the rest of the §3 techniques (firdaria, returns, lunar mansions, planetary hours, fixed stars, temperament, …), primary directions (#33), and the `SKILL.md` "which system?" clarify-step (so the layer is direct-invocation only, not yet surfaced through natural language).
 
 ## When changing the skill
 

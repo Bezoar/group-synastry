@@ -35,6 +35,24 @@ def normalize_longitude(lon: float) -> float:
     return lon % 360.0
 
 
+def sign_of(lon: float) -> str:
+    """The zodiac sign containing ecliptic longitude *lon* (degrees)."""
+    return SIGNS[int(normalize_longitude(lon) // 30)]
+
+
+def shorter_arc_separation(lon_a: float, lon_b: float) -> float:
+    """Angular separation between two longitudes along the shorter arc, in [0, 180]."""
+    d = abs(lon_a - lon_b) % 360.0
+    return 360.0 - d if d > 180.0 else d
+
+
+def whole_sign_house(point_lon: float, asc_lon: float) -> int:
+    """Whole-sign house (1..12) of *point_lon* counting from the rising sign: the
+    sign on the Ascendant is house 1, one whole sign per house forward. Shared by
+    the Hellenistic whole-sign and Vedic rasi house schemes."""
+    return (SIGNS.index(sign_of(point_lon)) - SIGNS.index(sign_of(asc_lon))) % 12 + 1
+
+
 def split_longitude_exact(lon: float) -> Position:
     """Exact split: degree, FLOORED arc-minute, and the residual arc-second.
 

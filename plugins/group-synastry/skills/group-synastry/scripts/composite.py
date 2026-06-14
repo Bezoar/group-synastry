@@ -72,8 +72,8 @@ def _make_point(name: str, lon: float, house: Optional[int] = None) -> Composite
 def midpoint_composite(person_a: dict, person_b: dict, house_system: str = "placidus") -> CompositeChart:
     chart_a = chart_mod.compute_natal(person_a, house_system=house_system)
     chart_b = chart_mod.compute_natal(person_b, house_system=house_system)
-    a_idx = {p.name: p.longitude for p in chart_a.planets}
-    b_idx = {p.name: p.longitude for p in chart_b.planets}
+    a_idx = chart_a.index_by_name()
+    b_idx = chart_b.index_by_name()
 
     points: list[CompositePoint] = []
     for name in COMPOSITE_BODIES:
@@ -224,13 +224,10 @@ def _main(argv: Optional[list[str]] = None) -> int:
     else:
         from .render_md import render_composite, render_interpretation
         from . import render_docx as _rdocx
-    interpretation = None
-    if args.interpretation:
-        try:
-            interpretation = _rdocx.parse_interpretation_file(Path(args.interpretation))
-        except (OSError, json.JSONDecodeError, _rdocx.RenderError) as exc:
-            print(f"Error reading --interpretation {args.interpretation}: {exc}", file=sys.stderr)
-            return 2
+    interpretation, err = _rdocx.load_interpretation_arg(args.interpretation)
+    if err:
+        print(err, file=sys.stderr)
+        return 2
     print(render_composite(report) + render_interpretation(interpretation))
     return 0
 
